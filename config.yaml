@@ -31,11 +31,11 @@ data_preprocess_config:
 
 
 train_model_config:
-  use_gpu: False
+  use_gpu: True
   gpu_ids:
-    - 6
-    - 7
-  batch_size: 4
+    - 0
+    - 1
+  batch_size: 256
   num_works: 0
   his_step: 11
   max_pred_num: 8

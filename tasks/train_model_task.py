@@ -52,7 +52,7 @@ class TrainModelTask(BaseTask):
         )
         data_loader = DataLoader(
             waymo_dataset,
-            shuffle=False,
+            shuffle=True,
             batch_size=train_model_config.batch_size,
             num_workers=train_model_config.num_works,
             pin_memory=True,

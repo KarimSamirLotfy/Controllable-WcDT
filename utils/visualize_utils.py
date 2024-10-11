@@ -38,12 +38,10 @@ class VisualizeUtil:
             ax[1].plot(x_list, y_list, color="grey")
         # 画原图,画模型输出
         for i in range(predicted_num):
-            ax[0].plot(real_traj[i, :, 0], real_traj[i, :, 1])
-            ax[1].plot(model_output[i, :, 0], model_output[i, :, 1])
+            ax[0].plot(real_traj[i, :, 0], real_traj[i, :, 1],  marker='.', linestyle='None', markevery=5)
+            ax[1].plot(model_output[i, :, 0], model_output[i, :, 1],  marker='.', linestyle='None', markevery=5)
 
-        # label = 'Epoch {0}'.format(num_epoch)
-        # plt.show()
-        # fig.text(0.5, 0.04, label, ha='center')
+
         plt.savefig(image_path)
         plt.close('all')  # 避免内存泄漏
         print("save_image_success")
