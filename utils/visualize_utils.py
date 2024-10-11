@@ -27,8 +27,8 @@ class VisualizeUtil:
         predicted_future_traj = predicted_future_traj[:predicted_num]
         predicted_his_traj = predicted_his_traj[:predicted_num]
         map_feature_list = eval(data['map_json'][0])
-        real_traj = torch.cat((predicted_his_traj, predicted_future_traj), dim=1)[:, :, :2].detach().numpy()
-        model_output = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, :2].detach().numpy()
+        real_traj = torch.cat((predicted_his_traj, predicted_future_traj), dim=1)[:, :, :2].cpu().detach().numpy()
+        model_output = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, :2].cpu().detach().numpy()
         fig, ax = plt.subplots(1, 2, figsize=(10, 5))
         # 画地图
         for map_feature in map_feature_list:

@@ -94,16 +94,16 @@ class SceneEncoder(nn.Module):
         x = predicted_his_traj_delt + (noise * 0.001)
         x = torch.flatten(x, start_dim=2)
         other_his_traj_delt = torch.flatten(other_his_traj_delt, start_dim=2)
-        # 对各个位置进行位置编码
+        # 对各个位置进行位置编码 Position-encode individual locations
         lane_list = self.pos_embedding(lane_list)
         lane_list = lane_list.view(batch_size, -1, self.embedding_dim)
         traffic_light_pos = self.pos_embedding(traffic_light_pos)
         other_his_pos = self.pos_embedding(other_his_pos)
         predicted_his_pos = self.pos_embedding(predicted_his_pos)
-        # 对属性进行编码
+        # 对属性进行编码 Encode attributes
         other_feature = self.feature_embedding(other_feature)
         predicted_feature = self.feature_embedding(predicted_feature)
-        # 组合输入信息
+        # 组合输入信息 Combine input information
         x = torch.cat((x, predicted_his_pos, predicted_feature), dim=-1)
         # batch, obs_num(15), 256
         x = self.linear_input(x)
