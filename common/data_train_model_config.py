@@ -12,9 +12,9 @@ from common.data import BaseConfig
 
 
 class TrainModelConfig(BaseConfig):
-    use_gpu: bool = False
-    gpu_ids: List[int] = None
-    batch_size: int = 0
+    use_gpu: bool = True
+    gpu_ids: List[int] = [1]
+    batch_size: int = 8
     num_works: int = 20
     his_step: int = 11
     max_pred_num: int = 8
@@ -29,3 +29,4 @@ class TrainModelConfig(BaseConfig):
     schedule: str = "cosine"
     num_epoch: int = 0
     init_lr: float = 0.00001
+    diffusion_type: str = "dit" # dit, unet, none (None for no diffusion)

@@ -49,9 +49,9 @@ class MultiModalLoss(nn.Module):
 
 
 class BackBone(nn.Module):
-    def __init__(self, betas: np.ndarray):
+    def __init__(self, betas: np.ndarray, diffusion_type: str):
         super(BackBone, self).__init__()
-        self.diffusion = GaussianDiffusion(betas=betas)
+        self.diffusion = GaussianDiffusion(betas=betas, diffusion_type=diffusion_type)
         self.scene_encoder = SceneEncoder()
         self.traj_decoder = TrajDecoder()
         self.multi_modal_loss = MultiModalLoss()
@@ -79,7 +79,7 @@ class BackBone(nn.Module):
         # diffusion训练
         noise = torch.randn_like(predicted_his_traj_delt)
         diffusion_loss = self.diffusion(data)
-        noise = self.diffusion.sample(noise, predicted_his_traj)
+        noise = self.diffusion.sample(noise, predicted_his_traj) # 64 seconds batch 4
         # scene encoder
         scene_feature = self.scene_encoder(
             noise, lane_list,

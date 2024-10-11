@@ -130,7 +130,7 @@ class TrainModelTask(BaseTask):
                 schedule_low * 1000 / train_model_config.time_steps,
                 schedule_high * 1000 / train_model_config.time_steps,
             )
-        model = BackBone(betas)
+        model = BackBone(betas, diffusion_type=train_model_config.diffusion_type)
         if task_config.pre_train_model:
             pre_train_model_path = task_config.pre_train_model
             model_dict = model.state_dict()

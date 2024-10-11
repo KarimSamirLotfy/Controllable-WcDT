@@ -8,3 +8,16 @@ https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
 
 And this could lead to expolits with the secruity team. so removeed the anaconda channels and used the default anaconda channels. 
 ## Stoped the odd channels. and did some changes to the verioining. 
+
+
+# Runiing for baseline runs. but It seesm GPU is underutalized and cpu is over utalized. 
+
+
+# This repo does not save trained models. aka we must do so. Very weird
+
+# TODO
+[] Must train quicker. it is too slow. not using GPU enough. I think it is not even using batching process. 
+[] this repo also can save gifs. which could be more usefull 
+[] has show results that creates gifs. use it to create some gifs for visualisations
+[] add tensorboard
+[] results

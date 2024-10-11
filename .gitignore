@@ -10,3 +10,5 @@ valid_set/*
 output/*
 data_set/*
 data_output/*
+
+*.log
