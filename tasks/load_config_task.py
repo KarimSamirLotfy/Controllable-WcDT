@@ -128,6 +128,12 @@ class LoadConfigTask(BaseTask):
             task_config.image_dir,
             result_data.task_id
         )
+        # tensorboard保存路径
+        task_config.tensorboard_dir = os.path.join(
+            task_config.output_dir,
+            task_config.tensorboard_dir,
+            result_data.task_id
+        )
         # os.makedirs(task_config.image_dir, exist_ok=True)
         # 数据预处理输出
         os.makedirs(task_config.data_output, exist_ok=True)

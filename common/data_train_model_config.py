@@ -29,4 +29,4 @@ class TrainModelConfig(BaseConfig):
     schedule: str = "cosine"
     num_epoch: int = 0
     init_lr: float = 0.00001
-    diffusion_type: str = "dit" # dit, unet, none (None for no diffusion)
+    diffusion_type: str = "dit" # dit, unet, none (None for )

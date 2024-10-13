@@ -45,3 +45,4 @@ class VisualizeUtil:
         plt.savefig(image_path)
         plt.close('all')  # 避免内存泄漏
         print("save_image_success")
+        return fig

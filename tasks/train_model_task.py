@@ -21,6 +21,7 @@ from common import WaymoDataset
 from net_works import BackBone
 from tasks import BaseTask
 from utils import MathUtil, VisualizeUtil
+from torch.utils.tensorboard import SummaryWriter
 
 
 class TrainModelTask(BaseTask):
@@ -75,6 +76,7 @@ class TrainModelTask(BaseTask):
             optimizer: Optimizer, model: Union[BackBone, nn.DataParallel],
             data_loader: DataLoader, result_info: LoadConfigResultDate
     ):
+        writer = result_info.train_model_config.writer
         diffusion_losses = 0
         traj_losses = 0
         confidence_losses = 0
@@ -94,19 +96,28 @@ class TrainModelTask(BaseTask):
             total_loss = diffusion_loss + traj_loss + confidence_loss
             total_loss.backward()
             optimizer.step()
+
+            # Logging
             total_losses += total_loss.item()
             diffusion_losses += diffusion_loss.item()
             traj_losses += traj_loss.item()
             confidence_losses += confidence_loss.item()
-            pbar.set_postfix(**{'total_loss': total_losses / (iteration + 1),
-                                'diffusion_loss': diffusion_losses / (iteration + 1),
-                                'traj_losses': traj_losses / (iteration + 1),
-                                'confidence_losses': confidence_losses / (iteration + 1)})
+            pbar.set_postfix(**{'train/total_loss': total_losses / (iteration + 1),
+                                'train/diffusion_loss': diffusion_losses / (iteration + 1),
+                                'train/traj_losses': traj_losses / (iteration + 1),
+                                'train/confidence_losses': confidence_losses / (iteration + 1)})
+            
+            global_iteration = epoch_num * epoch_step + iteration
+            writer.add_scalar('total_loss', total_losses / (iteration + 1), global_iteration)
+            writer.add_scalar('diffusion_loss', diffusion_losses / (iteration + 1), global_iteration)
+            writer.add_scalar('traj_losses', traj_losses / (iteration + 1), global_iteration)
+            writer.add_scalar('confidence_losses', confidence_losses / (iteration + 1), global_iteration)
             pbar.update()
             if iteration % 10 == 0:
                 image_path = os.path.join(result_info.task_config.image_dir,
                                           f"epoch_{epoch_num}_batch_num_{iteration}_image.png")
-                VisualizeUtil.show_result(image_path, min_loss_traj, data)
+                fig = VisualizeUtil.show_result(image_path, min_loss_traj, data)
+                writer.add_figure('trajector-img', fig, global_iteration)
 
     @staticmethod
     def init_dirs(result_info: LoadConfigResultDate):
@@ -115,9 +126,13 @@ class TrainModelTask(BaseTask):
             shutil.rmtree(task_config.image_dir)
         os.makedirs(task_config.image_dir, exist_ok=True)
         os.makedirs(task_config.model_dir, exist_ok=True)
+        os.makedirs(task_config.tensorboard_dir, exist_ok=True)
 
     def init_model(self, result_info: LoadConfigResultDate) -> Union[BackBone, nn.DataParallel]:
         train_model_config = result_info.train_model_config
+        # Add tesnorboard
+        writer = SummaryWriter(log_dir=result_info.task_config.tensorboard_dir)
+        train_model_config.writer = writer
         task_config = result_info.task_config
         # 初始化diffusion的betas
         if train_model_config.schedule == "cosine":

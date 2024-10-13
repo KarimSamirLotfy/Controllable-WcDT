@@ -34,6 +34,8 @@ class TaskConfig(BaseConfig):
     train_dir: str = ""
     val_dir: str = ""
     test_dir: str = ""
+    # tensorboard
+    tensorboard_dir: str = ""
 
     @property
     def task_list(self) -> List[TaskType]:

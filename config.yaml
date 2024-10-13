@@ -24,6 +24,8 @@ task_config:
   val_dir: "val_dir"
   test_dir: "test_dir"
 
+  tensorboard_dir: "tensorboard_logs"
+
 data_preprocess_config:
   data_size: 100
   max_data_size: 2000
