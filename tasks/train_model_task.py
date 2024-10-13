@@ -37,6 +37,8 @@ class TrainModelTask(BaseTask):
         train_dir = result_info.task_config.train_dir
         train_model_config = result_info.train_model_config
         self.init_dirs(result_info)
+        # save a copy of config
+
         # 初始化device
         if train_model_config.use_gpu:
             if train_model_config.gpu_ids:
@@ -127,6 +129,7 @@ class TrainModelTask(BaseTask):
         os.makedirs(task_config.image_dir, exist_ok=True)
         os.makedirs(task_config.model_dir, exist_ok=True)
         os.makedirs(task_config.tensorboard_dir, exist_ok=True)
+        os.makedirs(task_config.result_dir, exist_ok=True)
 
     def init_model(self, result_info: LoadConfigResultDate) -> Union[BackBone, nn.DataParallel]:
         train_model_config = result_info.train_model_config

@@ -25,6 +25,7 @@ task_config:
   test_dir: "test_dir"
 
   tensorboard_dir: "tensorboard_logs"
+  configs_dir: "configs"
 
 data_preprocess_config:
   data_size: 100

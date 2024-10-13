@@ -9,6 +9,7 @@
 import os
 import random
 from datetime import datetime
+import shutil
 
 import torch
 import yaml
@@ -151,6 +152,10 @@ class LoadConfigTask(BaseTask):
                                             task_config.test_dir)
         # os.makedirs(task_config.test_dir, exist_ok=True)
         result_data.task_logger.logger.info(str(task_config))
+        # save the config.yaml copy to output dir
+        task_config.configs_dir = os.path.join(task_config.output_dir, task_config.configs_dir, result_data.task_id)
+        os.makedirs(task_config.configs_dir, exist_ok=True)
+        shutil.copy(CONFIG_PATH, os.path.join(task_config.configs_dir, "config.yaml"))
         result_data.task_logger.logger.info("task config init success")
 
     @staticmethod

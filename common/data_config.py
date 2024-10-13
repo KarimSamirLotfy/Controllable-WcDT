@@ -36,6 +36,7 @@ class TaskConfig(BaseConfig):
     test_dir: str = ""
     # tensorboard
     tensorboard_dir: str = ""
+    configs_dir: str = ""
 
     @property
     def task_list(self) -> List[TaskType]:

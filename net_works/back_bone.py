@@ -79,7 +79,11 @@ class BackBone(nn.Module):
         # diffusion训练
         noise = torch.randn_like(predicted_his_traj_delt)
         diffusion_loss = self.diffusion(data)
+
+        # HEre we use a sampled path from noise
         noise = self.diffusion.sample(noise, predicted_his_traj) # 64 seconds batch 4
+        # for speed up. We will use the ground truth path
+        # noise = predicted_his_traj_delt
         # scene encoder
         scene_feature = self.scene_encoder(
             noise, lane_list,
