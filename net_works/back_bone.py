@@ -49,12 +49,14 @@ class MultiModalLoss(nn.Module):
 
 
 class BackBone(nn.Module):
-    def __init__(self, betas: np.ndarray, diffusion_type: str):
+    def __init__(self, betas: np.ndarray, diffusion_type: str, teacher_forcing: bool):
         super(BackBone, self).__init__()
         self.diffusion = GaussianDiffusion(betas=betas, diffusion_type=diffusion_type)
         self.scene_encoder = SceneEncoder()
         self.traj_decoder = TrajDecoder()
         self.multi_modal_loss = MultiModalLoss()
+
+        self.teacher_forcing = teacher_forcing
 
     def forward(self, data: Dict):
         # batch, other_obs(10), 40, 7
@@ -81,9 +83,10 @@ class BackBone(nn.Module):
         diffusion_loss = self.diffusion(data)
 
         # HEre we use a sampled path from noise
-        noise = self.diffusion.sample(noise, predicted_his_traj) # 64 seconds batch 4
-        # for speed up. We will use the ground truth path
-        # noise = predicted_his_traj_delt
+        if self.teacher_forcing:
+            noise = predicted_his_traj_delt
+        else:
+            noise = self.diffusion.sample(noise, predicted_his_traj) # 64 seconds batch 4
         # scene encoder
         scene_feature = self.scene_encoder(
             noise, lane_list,

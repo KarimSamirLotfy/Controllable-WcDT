@@ -26,6 +26,7 @@ class TaskConfig(BaseConfig):
     waymo_test_dir: str = ""
     # 训练产生的图片保存路径
     image_dir: str = ""
+    gifs_dir: str = ""
     # 数据输出
     data_output: str = ""
     # 数据预处理保存路径

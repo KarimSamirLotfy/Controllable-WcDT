@@ -16,8 +16,20 @@ And this could lead to expolits with the secruity team. so removeed the anaconda
 # This repo does not save trained models. aka we must do so. Very weird
 
 # TODO
-[] Must train quicker. it is too slow. not using GPU enough. I think it is not even using batching process. 
-[] this repo also can save gifs. which could be more usefull 
-[] has show results that creates gifs. use it to create some gifs for visualisations
-[] add tensorboard
-[] results
+[x] Must train quicker. it is too slow. not using GPU enough. I think it is not even using batching process. 
+[x] this repo also can save gifs. which could be more usefull 
+[x] has show results that creates gifs. use it to create some gifs for visualisations
+[x] add tensorboard
+[x] results
+
+[] Analyse decisions made by team
+[] look at how to actually add query centric 
+[] Think about how will we do conditinoing/ samplgin control. 
+
+# SHOW the results of the teacher forcing
+
+
+[] Do with full data
+[ ] get the eval code. 
+[] decidec on to keep the arch or not. 
+# also ask for more space. Run ID: 

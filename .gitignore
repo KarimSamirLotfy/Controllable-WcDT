@@ -12,3 +12,4 @@ data_set/*
 data_output/*
 
 *.log
+investigate/*

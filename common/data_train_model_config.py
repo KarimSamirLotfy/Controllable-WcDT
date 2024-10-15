@@ -30,3 +30,8 @@ class TrainModelConfig(BaseConfig):
     num_epoch: int = 0
     init_lr: float = 0.00001
     diffusion_type: str = "dit" # dit, unet, none (None for )
+
+    teacher_forcing: bool = True
+    # saving model 
+    save_model: bool = False
+    save_interval_epoch: int = 10
