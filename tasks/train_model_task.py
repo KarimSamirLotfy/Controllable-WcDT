@@ -10,6 +10,7 @@ import os
 import shutil
 from typing import Union
 
+from tasks.show_result_task import ShowResultsTask
 import torch
 from torch import optim, nn
 from torch.optim import Optimizer
@@ -76,9 +77,9 @@ class TrainModelTask(BaseTask):
     def fit_one_epoch(
             self, epoch_num: int, epoch_step: int,
             optimizer: Optimizer, model: Union[BackBone, nn.DataParallel],
-            data_loader: DataLoader, result_info: LoadConfigResultDate
+            data_loader: DataLoader, result_info: LoadConfigResultDate 
     ):
-        writer = result_info.train_model_config.writer
+        writer: SummaryWriter = result_info.train_model_config.writer
         diffusion_losses = 0
         traj_losses = 0
         confidence_losses = 0
@@ -120,13 +121,25 @@ class TrainModelTask(BaseTask):
                                           f"epoch_{epoch_num}_batch_num_{iteration}_image.png")
                 fig = VisualizeUtil.show_result(image_path, min_loss_traj, data)
                 writer.add_figure('trajector-img', fig, global_iteration)
+            if result_info.train_model_config.save_model == True:
+                if epoch_num % result_info.train_model_config.save_interval_epoch == 0 and iteration == 0:
+                    model_save_path = os.path.join(result_info.task_config.model_dir,
+                                                   f"epoch_{epoch_num}_batch_num_{iteration}_model.pth")
+                    torch.save(model.state_dict(), model_save_path)
+                    # Visualise the results
+                    save_dir_path = os.path.join(result_info.task_config.gifs_dir, f'{epoch_num}-epoch') # create a folder with epoch number
+                    os.makedirs(save_dir_path, exist_ok=True)
+                    ShowResultsTask.show_results_validation(model=model, result_info=result_info, save_dir=save_dir_path, epoch_num=epoch_num,number_of_scenarios=3)
 
     @staticmethod
     def init_dirs(result_info: LoadConfigResultDate):
         task_config = result_info.task_config
         if os.path.exists(task_config.image_dir):
             shutil.rmtree(task_config.image_dir)
+        if os.path.exists(task_config.gifs_dir):
+            shutil.rmtree(task_config.gifs_dir)
         os.makedirs(task_config.image_dir, exist_ok=True)
+        os.makedirs(task_config.gifs_dir, exist_ok=True)
         os.makedirs(task_config.model_dir, exist_ok=True)
         os.makedirs(task_config.tensorboard_dir, exist_ok=True)
         os.makedirs(task_config.result_dir, exist_ok=True)
@@ -148,7 +161,7 @@ class TrainModelTask(BaseTask):
                 schedule_low * 1000 / train_model_config.time_steps,
                 schedule_high * 1000 / train_model_config.time_steps,
             )
-        model = BackBone(betas, diffusion_type=train_model_config.diffusion_type)
+        model = BackBone(betas, diffusion_type=train_model_config.diffusion_type, teacher_forcing=train_model_config.teacher_forcing)
         if task_config.pre_train_model:
             pre_train_model_path = task_config.pre_train_model
             model_dict = model.state_dict()

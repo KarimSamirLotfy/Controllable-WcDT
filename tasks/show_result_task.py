@@ -26,32 +26,36 @@ from common import TaskType, LoadConfigResultDate
 from net_works import BackBone
 from tasks import BaseTask
 from utils import DataUtil, MathUtil, MapUtil
+from PIL import Image, ImageSequence
 
-RESULT_DIR = r"/home/haomo/yangchen/Scene-Diffusion/output/image"
-DATA_SET_PATH = r"/home/haomo/yangchen/Scene-Diffusion/data_set/train_set/training.tfrecord-00000-of-01000"
-MODEL_PATH = r"/home/haomo/yangchen/Scene-Diffusion/model_epoch152.pth"
+RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
+DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
+VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
+MODEL_PATH = r"/home/k.lotfy/WcDT/investigate/normal_run_vs_teacher_forced/model/20241013-19-13-49_90670/epoch_180_batch_num_0_model.pth"
 
 
 class ShowResultsTask(BaseTask):
+    TASK_TYPE = TaskType.SHOW_RESULTS
+    CMAP = LinearSegmentedColormap.from_list(
+        'my_cmap',
+        [np.array([0., 232., 157.]) / 255, np.array([0., 120., 255.]) / 255],
+        100
+    )
+    COLOR_DICT = {
+        0: np.array([0., 120., 255.]) / 255,
+        1: np.array([0., 232., 157.]) / 255,
+        2: np.array([255., 205., 85.]) / 255,
+        3: np.array([244., 175., 145.]) / 255,
+        4: np.array([145., 80., 200.]) / 255,
+        5: np.array([0., 51., 102.]) / 255,
+        6: np.array([1, 0, 0]),
+        7: np.array([0, 1, 0]),
+    }
 
     def __init__(self):
-        super(ShowResultsTask, self).__init__()
-        self.task_type = TaskType.SHOW_RESULTS
-        self.cmap = LinearSegmentedColormap.from_list(
-            'my_cmap',
-            [np.array([0., 232., 157.]) / 255, np.array([0., 120., 255.]) / 255],
-            100
-        )
-        self.color_dict = {
-            0: np.array([0., 120., 255.]) / 255,
-            1: np.array([0., 232., 157.]) / 255,
-            2: np.array([255., 205., 85.]) / 255,
-            3: np.array([244., 175., 145.]) / 255,
-            4: np.array([145., 80., 200.]) / 255,
-            5: np.array([0., 51., 102.]) / 255,
-            6: np.array([1, 0, 0]),
-            7: np.array([0, 1, 0]),
-        }
+        self.task_type = self.TASK_TYPE
+        self.cmap = self.CMAP
+        self.color_dict = self.COLOR_DICT
 
     def execute(self, result_info: LoadConfigResultDate):
         if os.path.exists(RESULT_DIR):
@@ -62,7 +66,11 @@ class ShowResultsTask(BaseTask):
     @staticmethod
     def load_pretrain_model(result_info: LoadConfigResultDate) -> BackBone:
         betas = MathUtil.generate_linear_schedule(result_info.train_model_config.time_steps)
-        model = BackBone(betas).eval()
+
+        model = BackBone(betas, 
+                         diffusion_type=result_info.train_model_config.diffusion_type, 
+                         teacher_forcing=False # To test must use previous model output
+                 ).eval()
         device = torch.device("cpu")
         pretrained_dict = torch.load(MODEL_PATH, map_location=device)
         model_dict = model.state_dict()
@@ -120,6 +128,12 @@ class ShowResultsTask(BaseTask):
             self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
             image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
             self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
+                        # 可视化ground truth
+            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
+            self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
+            # 可视化model output
+            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
+            self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
 
         fig, axis = plt.subplots(1, 1, figsize=(10, 11))
         num = np.array([i for i in range(91)])
@@ -133,6 +147,46 @@ class ShowResultsTask(BaseTask):
         plt.savefig(image_path)
         plt.close('all')  # 避免内存泄漏
 
+    @staticmethod
+    def show_results_validation(model, result_info: LoadConfigResultDate, save_dir: str, epoch_num:int,number_of_scenarios: int=10):
+        match_filenames = tf.io.matching_files([VALIDATION_DATA_SET_PATH])
+        dataset = tf.data.TFRecordDataset(match_filenames, name="train_data")
+        dataset = dataset.shuffle(buffer_size=number_of_scenarios*5)  # Shuffle with a buffer size of 1000
+        dataset = dataset.take(number_of_scenarios)  # Then take the first 100 elements
+
+        dataset_iterator = dataset.as_numpy_iterator()
+        for index, scenario_bytes in enumerate(dataset_iterator):
+            scenario = scenario_pb2.Scenario.FromString(scenario_bytes)
+            data_dict = DataUtil.transform_data_to_input(scenario, result_info)
+            for key, value in data_dict.items():
+                if isinstance(value, torch.Tensor):
+                    data_dict[key] = value.to(torch.float32).unsqueeze(dim=0)
+
+            predict_traj = model(data_dict)[-1].cpu().detach()
+            predicted_traj_mask = data_dict['predicted_traj_mask'][0].cpu().detach()
+            predicted_future_traj = data_dict['predicted_future_traj'][0].cpu().detach()
+            predicted_his_traj = data_dict['predicted_his_traj'][0].cpu().detach()
+            predicted_num = 0
+            for i in range(predicted_traj_mask.shape[0]):
+                if int(predicted_traj_mask[i]) == 1:
+                    predicted_num += 1
+            generate_traj = predict_traj[:predicted_num]
+            predicted_future_traj = predicted_future_traj[:predicted_num]
+            predicted_his_traj = predicted_his_traj[:predicted_num]
+            real_traj = torch.cat((predicted_his_traj, predicted_future_traj), dim=1)[:, :, :2].cpu().detach().numpy()
+            real_yaw = torch.cat((predicted_his_traj, predicted_future_traj), dim=1)[:, :, 2].cpu().detach().numpy()
+            model_output = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, :2].cpu().detach().numpy()
+            model_yaw = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, 2].cpu().detach().numpy()
+            # image_path = os.path.join(save_dir, f"{index}_ground_truth.gif")
+            # ShowResultsTask.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
+            image_path = os.path.join(save_dir, f"{index}_model_output.gif")
+            ShowResultsTask.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
+
+            # validation images in writer 
+            # fig = ShowResultsTask.draw_scene(predicted_num, real_traj, data_dict, scenario, os.path.join(save_dir, f"{index}_ground_truth.png"), return_fig=True)
+            # result_info.train_model_config.writer.add_figure(f'validation/ground_truth', fig, epoch_num)
+            fig = ShowResultsTask.draw_scene(predicted_num, model_output, data_dict, scenario, os.path.join(save_dir, f"{index}_model_output.png"), return_fig=True)
+            result_info.train_model_config.writer.add_figure(f'validation/model_output', fig, epoch_num)
     @staticmethod
     def draw_input(scenario: Scenario, image_path: str):
         fig, axis = plt.subplots(1, 1, figsize=(10, 10))
@@ -154,9 +208,10 @@ class ShowResultsTask(BaseTask):
         plt.savefig(image_path)
         plt.close('all')  # 避免内存泄漏
 
+    @staticmethod
     def draw_scene(
-            self, predicted_num: int, traj: np.ndarray,
-            data_dict: Dict[str, Any], scenario: Scenario, image_path: str
+            predicted_num: int, traj: np.ndarray,
+            data_dict: Dict[str, Any], scenario: Scenario, image_path: str, return_fig=False
     ):
         fig, axis = plt.subplots(1, 1, figsize=(10, 10))
         visualizations.add_map(axis, scenario)
@@ -172,18 +227,21 @@ class ShowResultsTask(BaseTask):
                     real_traj_x[j - 2:j],
                     real_traj_y[j - 2:j],
                     linewidth=5,
-                    color=self.cmap(num[j]),
+                    color=ShowResultsTask.CMAP(num[j]),
                 )
         axis.set_xticks([])
         axis.set_yticks([])
         # plt.show()
+        if return_fig:
+            return fig
         plt.savefig(image_path)
         plt.close('all')  # 避免内存泄漏
         print(f"{image_path} save success")
 
+    @staticmethod
     def draw_gif(
-            self, predicted_num: int, traj: np.ndarray, real_yaw: np.ndarray,
-            data_dict: Dict[str, Any], scenario: Scenario, image_path: str
+            predicted_num: int, traj: np.ndarray, real_yaw: np.ndarray,
+            data_dict: Dict[str, Any], scenario: Scenario, image_path: str, return_animations=False
     ):
         fig, axis = plt.subplots(1, 1, figsize=(10, 10))
         visualizations.add_map(axis, scenario)
@@ -214,9 +272,9 @@ class ShowResultsTask(BaseTask):
             bboxes = list()
             for j in range(x_list.shape[0]):
                 bboxes.append(axis.add_patch(
-                    self.get_bbox_patch(
+                    ShowResultsTask.get_bbox_patch(
                         x_list[:, t][j], y_list[:, t][j], yaw_list[:, t][j],
-                        predicted_feature[j, 1], predicted_feature[j, 0], self.color_dict[j]
+                        predicted_feature[j, 1], predicted_feature[j, 0], ShowResultsTask.COLOR_DICT[j]
                     )
                 ))
             return bboxes
@@ -227,9 +285,12 @@ class ShowResultsTask(BaseTask):
         axis.set_xticks([])
         axis.set_yticks([])
         # plt.show()
+        if return_animations:
+            return animations
         animations.save(image_path, writer='ffmpeg', fps=30)
         plt.close('all')  # 避免内存泄漏
         print(f"{image_path} save success")
+        return animations, fig
 
     @staticmethod
     def get_bbox_patch(
@@ -246,7 +307,6 @@ class ShowResultsTask(BaseTask):
         rect = patches.Rectangle(
             left_rear_global, length, width, angle=np.rad2deg(bbox_yaw), color=color)
         return rect
-
 
 if __name__ == "__main__":
     # show_result()

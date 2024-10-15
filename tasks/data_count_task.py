@@ -80,4 +80,6 @@ class DataCountTask(BaseTask):
         y_pred = kmeans.predict(feature_array)
         plt.scatter(feature_array[:, 0], feature_array[:, 1], c=y_pred, s=5, cmap='viridis')
         plt.show()
+        plt.savefig(os.path.join(result_dir, f"{result_info.task_id}-data-count.png"))
 
+        print("data count success")

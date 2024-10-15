@@ -108,7 +108,7 @@ class LoadConfigTask(BaseTask):
         if len(task_config.task_list) != len(set(task_config.task_list)):
             raise ValueError("task_config must be unique")
         # 创建model save dir
-        task_config.model_dir = os.path.join(task_config.output_dir, task_config.model_dir)
+        # task_config.model_dir = os.path.join(task_config.output_dir, task_config.model_dir)
         # os.makedirs(task_config.model_dir, exist_ok=True)
         # 创建result dir
         task_config.result_dir = os.path.join(task_config.output_dir, task_config.result_dir)
@@ -129,10 +129,21 @@ class LoadConfigTask(BaseTask):
             task_config.image_dir,
             result_data.task_id
         )
+        task_config.gifs_dir = os.path.join(
+            task_config.output_dir,
+            task_config.gifs_dir,
+            result_data.task_id
+        )
         # tensorboard保存路径
         task_config.tensorboard_dir = os.path.join(
             task_config.output_dir,
             task_config.tensorboard_dir,
+            result_data.task_id
+        )
+        # save model dir
+        task_config.model_dir = os.path.join(
+            task_config.output_dir,
+            task_config.model_dir,
             result_data.task_id
         )
         # os.makedirs(task_config.image_dir, exist_ok=True)
