@@ -125,30 +125,32 @@ class ShowResultsTask(BaseTask):
             real_yaw = torch.cat((predicted_his_traj, predicted_future_traj), dim=1)[:, :, 2].detach().numpy()
             model_output = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, :2].detach().numpy()
             model_yaw = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, 2].detach().numpy()
-            # 可视化输入
-            image_path = os.path.join(RESULT_DIR, f"{index}_input.png")
-            self.draw_input(scenario, image_path)
-            # 可视化ground truth
-            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
-            self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
-            # 可视化model output
-            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
-            self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
-            # 可视化ground truth
-            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
-            self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
-            # 可视化model output
-            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
-            self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
-            # GIFS
-            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.gif")
-            self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
-            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
-            self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
+            # # 可视化输入
+            # image_path = os.path.join(RESULT_DIR, f"{index}_input.png")
+            # self.draw_input(scenario, image_path)
+            # # 可视化ground truth
+            # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
+            # self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
+            # # 可视化model output
+            # image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
+            # self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
+            # # 可视化ground truth
+            # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
+            # self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
+            # # 可视化model output
+            # image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
+            # self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
+            # # GIFS
+            # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.gif")
+            # self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
+            # image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
+            # self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
             image_path = os.path.join(RESULT_DIR, f"{index}_scenario.gif")
             self.draw_gif_from_scenario(predicted_num,scenario, submission_specs, image_path)
-
-
+            ## Now we also get the simulated states
+            curr_x, curr_y, curr_heading, sdc_indx = data_dict['curr_loc']
+            
+            EvalUtil.to_sumulated_states(curr_x=curr_x, curr_y=curr_y, curr_z=0, curr_heading=curr_heading, traj=model_output, real_yaw=real_yaw, predicted_num=predicted_num)
 
     
 
@@ -422,6 +424,7 @@ class ShowResultsTask(BaseTask):
         # Store trajectory points
         x_list = []
         y_list = []
+        yaw_list = []
         width_list = []
         length_list = []
         for idx, track in enumerate(tracks):
@@ -431,34 +434,43 @@ class ShowResultsTask(BaseTask):
                 if np.all(valids):
                     x = np.array([state.center_x for i, state in enumerate(track.states)])
                     y = np.array([state.center_y for i, state in enumerate(track.states)])
+                    yaw = np.array([state.heading for i, state in enumerate(track.states)])
                     width = np.array([state.width for i, state in enumerate(track.states)])
                     length = np.array([state.length for i, state in enumerate(track.states)])
                     x_list.append(x)
                     y_list.append(y)
+                    yaw_list.append(yaw)
                     width_list.append(width)
                     length_list.append(length)
         
         # # Stack the x and y coordinates
         x_list = np.stack(x_list, axis=0)
         y_list = np.stack(y_list, axis=0)
+        yaw_list = np.stack(yaw_list, axis=0)
         width_list = np.stack(width_list, axis=0)
         length_list = np.stack(length_list, axis=0)
         # Function to animate the plotting of the tracks
+        # Adapted function using the better bounding box implementation
         def animate(t: int) -> list[patches.Rectangle]:
             # Clear previous patches
             for _ in range(len(axis.patches)):
                 axis.patches.pop()
-
+            
             bboxes = []
             for j in range(len(x_list)):
-                # Plot a simple rectangle at the position of the track
+                # Use the get_bbox_patch method for better bounding boxes
                 bboxes.append(axis.add_patch(
-                    patches.Rectangle(
-                        (x_list[j, t], y_list[j, t]), width_list[j, t], length_list[j, t],
-                        color=ShowResultsTask.COLOR_DICT[j % len(ShowResultsTask.COLOR_DICT)], alpha=0.5
+                    ShowResultsTask.get_bbox_patch(
+                        x=x_list[j, t], 
+                        y=y_list[j, t], 
+                        bbox_yaw=yaw_list[j, t],  # Assuming yaw_list contains the orientation for each object
+                        length=length_list[j, t], 
+                        width=width_list[j, t], 
+                        color=ShowResultsTask.COLOR_DICT[j % len(ShowResultsTask.COLOR_DICT)]
                     )
                 ))
             return bboxes
+
 
         # Create the animation
         animations = animation.FuncAnimation(
