@@ -37,7 +37,6 @@ from net_works import BackBone
 from tasks import BaseTask
 from utils import DataUtil, MathUtil, MapUtil
 from PIL import Image, ImageSequence
-from gene_submission import inference_valid_set
 RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
 DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
 VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
@@ -147,12 +146,6 @@ class ShowResultsTask(BaseTask):
             # self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
             image_path = os.path.join(RESULT_DIR, f"{index}_scenario.gif")
             self.draw_gif_from_scenario(predicted_num,scenario, submission_specs, image_path)
-            ## Now we also get the simulated states
-            curr_x, curr_y, curr_heading, sdc_indx = data_dict['curr_loc']
-            
-            EvalUtil.to_sumulated_states(curr_x=curr_x, curr_y=curr_y, curr_z=0, curr_heading=curr_heading, traj=model_output, real_yaw=real_yaw, predicted_num=predicted_num)
-
-    
 
 
 
@@ -200,7 +193,7 @@ class ShowResultsTask(BaseTask):
             predicted_obs_traj = predicted_obs_traj.cpu().detach().numpy()
 
             ### PUT into siumlation format of (x, y, z, heading) ### Do this via extrapolation
-            predicted_obs_id_traj = {obs_id: predicted_obs_traj[index] for index, obs_id in enumerate(predicted_obs_id_in_pkl)}
+            predicted_obs_id_traj = {obs_id: predicted_obs_traj[index] for index, obs_id in enumerate(data_dict['predicted_obs_index'])}
             # 自车在当前时刻的位置 The position of the vehicle at the current moment
             curr_loc = data_dict['curr_loc']
             simulated_states = list()
@@ -240,8 +233,23 @@ class ShowResultsTask(BaseTask):
             scenario_metrics = metrics.compute_scenario_metrics_for_bundle(
                 config, scenario, scenario_rollouts)
             print(scenario_metrics)
-            result_info.train_model_config.writer.add_text(f'validation/metrics', metrics, epoch_num*number_of_scenarios+idx)
-        
+            logs = {
+                'metametric': scenario_metrics.metametric,
+                'linear_acceleration_likelihood': scenario_metrics.linear_acceleration_likelihood,
+                'time_to_collision_likelihood': scenario_metrics.time_to_collision_likelihood,
+                'offroad_indication_likelihood': scenario_metrics.offroad_indication_likelihood,
+                'min_average_displacement_error': scenario_metrics.min_average_displacement_error,
+                'linear_speed_likelihood': scenario_metrics.linear_speed_likelihood,
+                'distance_to_road_edge_likelihood': scenario_metrics.distance_to_road_edge_likelihood,
+                'distance_to_nearest_object_likelihood': scenario_metrics.distance_to_nearest_object_likelihood,
+                'collision_indication_likelihood': scenario_metrics.collision_indication_likelihood,
+                'average_displacement_error': scenario_metrics.average_displacement_error,
+                'angular_speed_likelihood': scenario_metrics.angular_speed_likelihood,
+                'angular_acceleration_likelihood': scenario_metrics.angular_acceleration_likelihood
+            }
+            writer = result_info.train_model_config.writer
+            for key, value in logs.items():
+                writer.add_scalar(f'metrics/{key}', value, epoch_num*number_of_scenarios+index)
 
 
 

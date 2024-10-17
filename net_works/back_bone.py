@@ -60,15 +60,15 @@ class BackBone(nn.Module):
 
     def forward(self, data: Dict):
         # batch, other_obs(10), 40, 7
-        predicted_feature = data['predicted_feature']
+        predicted_feature = data['predicted_feature'] # 4, 8, 7
         # batch, other_obs(10), 40, 5
-        other_his_pos = data['other_his_pos']
-        other_his_traj_delt = data['other_his_traj_delt']
-        other_feature = data['other_feature']
+        other_his_pos = data['other_his_pos'] # 4, 6, 2
+        other_his_traj_delt = data['other_his_traj_delt'] # 4, 6, 10, 5
+        other_feature = data['other_feature'] # 4, 6, 7
         other_traj_mask = data['other_traj_mask']
         # batch, pred_obs(15), 40, 5
-        predicted_his_pos = data['predicted_his_pos']
-        predicted_his_traj_delt = data['predicted_his_traj_delt']
+        predicted_his_pos = data['predicted_his_pos'] # 4, 8, 2
+        predicted_his_traj_delt = data['predicted_his_traj_delt'] # 4, 8, 10, 5
         predicted_his_traj = data['predicted_his_traj']
         # batch, pred_obs(15), 50, 5
         predicted_future_traj = data['predicted_future_traj']
@@ -100,3 +100,41 @@ class BackBone(nn.Module):
         traj_loss, confidence_loss, min_loss_traj = self.multi_modal_loss(traj, confidence, predicted_future_traj,
                                                                           predicted_traj_mask)
         return diffusion_loss, traj_loss, confidence_loss, min_loss_traj
+
+    def predict(self, data: Dict): 
+        # batch, other_obs(10), 40, 7
+        predicted_feature = data['predicted_feature']
+        # batch, other_obs(10), 40, 5
+        other_his_pos = data['other_his_pos']
+        other_his_traj_delt = data['other_his_traj_delt']
+        other_feature = data['other_feature']
+        other_traj_mask = data['other_traj_mask']
+        # batch, pred_obs(15), 40, 5
+        predicted_his_pos = data['predicted_his_pos']
+        predicted_his_traj_delt = data['predicted_his_traj_delt']
+        predicted_his_traj = data['predicted_his_traj']
+        predicted_traj_mask = data['predicted_traj_mask']
+        # batch, pred_obs(15), 50, 5
+        predicted_future_traj = data['predicted_future_traj']
+        predicted_traj_mask = data['predicted_traj_mask']
+        # batch, tl_num(10), 2
+        traffic_light = data['traffic_light']
+        traffic_light_pos = data['traffic_light_pos']
+        # batch, num_lane(32), num_point(128), 2
+        lane_list = data['lane_list']
+        # diffusion训练
+        noise = torch.randn_like(predicted_his_traj_delt)
+        noise = self.diffusion.sample(noise, predicted_his_traj) # 64 seconds batch 4
+        # scene encoder
+        scene_feature = self.scene_encoder(
+            noise, lane_list,
+            other_his_traj_delt, other_his_pos, other_feature,
+            predicted_his_traj_delt, predicted_his_pos, predicted_feature,
+            traffic_light, traffic_light_pos
+        )
+        # traj_decoder
+        traj, confidence = self.traj_decoder(scene_feature)
+        traj = MathUtil.post_process_output(traj, predicted_his_traj)
+        traj_loss, confidence_loss, min_loss_traj = self.multi_modal_loss(traj, confidence, predicted_future_traj,
+                                                                          predicted_traj_mask)                    
+        return min_loss_traj, confidence

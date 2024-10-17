@@ -367,6 +367,7 @@ class DataUtil:
             "traffic_mask": traffic_mask,
             "lane_list": lane_list,
             "map_json": map_json,
-            "curr_loc": data_dict['curr_loc']
+            "curr_loc": data_dict['curr_loc'],
+            "predicted_obs_index": predicted_index
         }
         return result
