@@ -6,9 +6,11 @@
 @Author: YangChen
 @Date: 2024/1/6
 """
+from ast import List
 import os.path
 import shutil
 from typing import Any, Dict
+from unittest import result
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,13 +23,21 @@ from matplotlib.colors import LinearSegmentedColormap
 from waymo_open_dataset.protos import scenario_pb2
 from waymo_open_dataset.protos.scenario_pb2 import Scenario
 from waymo_open_dataset.utils.sim_agents import visualizations, submission_specs
+from waymo_open_dataset.protos import scenario_pb2
+from waymo_open_dataset.protos import sim_agents_submission_pb2
+from waymo_open_dataset.utils import trajectory_utils
+from waymo_open_dataset.utils.sim_agents import submission_specs
+from waymo_open_dataset.wdl_limited.sim_agents_metrics import metrics
 
+from utils.data_utils import DataUtil
+from utils.eval_utils import EvalUtil
+from utils.map_utils import MapUtil
 from common import TaskType, LoadConfigResultDate
 from net_works import BackBone
 from tasks import BaseTask
 from utils import DataUtil, MathUtil, MapUtil
 from PIL import Image, ImageSequence
-
+from gene_submission import inference_valid_set
 RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
 DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
 VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
@@ -61,6 +71,7 @@ class ShowResultsTask(BaseTask):
         if os.path.exists(RESULT_DIR):
             shutil.rmtree(RESULT_DIR)
         os.makedirs(RESULT_DIR, exist_ok=True)
+        # self.evaluate_metrics(result_info)
         self.show_result(result_info)
 
     @staticmethod
@@ -123,29 +134,116 @@ class ShowResultsTask(BaseTask):
             # 可视化model output
             image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
             self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
-            # 可视化动态图
-            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.gif")
-            self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
-            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
-            self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
-                        # 可视化ground truth
+            # 可视化ground truth
             image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
             self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
             # 可视化model output
             image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
             self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
+            # GIFS
+            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.gif")
+            self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
+            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
+            self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
+            image_path = os.path.join(RESULT_DIR, f"{index}_scenario.gif")
+            self.draw_gif_from_scenario(predicted_num,scenario, submission_specs, image_path)
 
-        fig, axis = plt.subplots(1, 1, figsize=(10, 11))
-        num = np.array([i for i in range(91)])
-        segments = np.stack((num, num), axis=-1)[np.newaxis, :]
-        image_path = os.path.join(RESULT_DIR, f"color_bar.png")
-        line_segments = LineCollection(segments=segments, linewidths=1,
-                                       linestyles='solid', cmap=self.cmap)
-        cbar = fig.colorbar(line_segments, cmap=self.cmap, orientation='horizontal')
-        cbar.set_ticks(np.linspace(0, 1, 10))
-        cbar.set_ticklabels([str(i) for i in range(0, 91, 10)])
-        plt.savefig(image_path)
-        plt.close('all')  # 避免内存泄漏
+
+
+    
+
+
+
+    @staticmethod
+    def evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=3, print_verbose_comments=True): 
+        vprint = print if print_verbose_comments else lambda arg: None
+
+        ### READ VALIDATION DATA
+        match_filenames = tf.io.matching_files([VALIDATION_DATA_SET_PATH])
+        dataset = tf.data.TFRecordDataset(match_filenames, name="train_data")
+        dataset = dataset.shuffle(buffer_size=number_of_scenarios*5)  # Shuffle with a buffer size of 1000
+        dataset = dataset.take(number_of_scenarios)  # Then take the first 100 elements
+
+        dataset_iterator = dataset.as_numpy_iterator()
+        for index, scenario_bytes in enumerate(dataset_iterator):
+            scenario = scenario_pb2.Scenario.FromString(scenario_bytes)
+            data_dict = DataUtil.transform_data_to_input(scenario, result_info)
+            for key, value in data_dict.items():
+                if isinstance(value, torch.Tensor):
+                    data_dict[key] = value.to(torch.float32).unsqueeze(dim=0)
+
+            ### Data prepratation done
+
+            ### Create logged trajectories ###
+            # To load the data, we create a simple tensorized version of the object tracks.
+            logged_trajectories = trajectory_utils.ObjectTrajectories.from_scenario(scenario)
+            # Using `ObjectTrajectories` we can select just the objects that we need to
+            # simulate and remove the "future" part of the Scenario.
+            vprint(f'Original shape of tensors inside trajectories: {logged_trajectories.valid.shape} (n_objects, n_steps)')
+            logged_trajectories = logged_trajectories.gather_objects_by_id(
+                tf.convert_to_tensor(submission_specs.get_sim_agent_ids(scenario)))
+            logged_trajectories = logged_trajectories.slice_time(
+                start_index=0, end_index=submission_specs.CURRENT_TIME_INDEX + 1)
+            vprint(f'Modified shape of tensors inside trajectories: {logged_trajectories.valid.shape} (n_objects, n_steps)')
+            # We can verify that all of these objects are valid at the last step.
+            vprint(f'Are all agents valid: {tf.reduce_all(logged_trajectories.valid[:, -1]).numpy()}')
+
+            all_logged_trajectories = trajectory_utils.ObjectTrajectories.from_scenario(scenario)
+            all_logged_trajectories = all_logged_trajectories.slice_time(
+                start_index=0, end_index=submission_specs.N_FULL_SCENARIO_STEPS + 1)
+            predicted_obs_id = submission_specs.get_evaluation_sim_agent_ids(scenario)
+
+            ### MODEL INFERENCE ###
+            predicted_obs_traj, _confidence = model.predict(data_dict)
+            predicted_obs_traj = predicted_obs_traj.cpu().detach().numpy()
+
+            ### PUT into siumlation format of (x, y, z, heading) ### Do this via extrapolation
+            predicted_obs_id_traj = {obs_id: predicted_obs_traj[index] for index, obs_id in enumerate(predicted_obs_id_in_pkl)}
+            # 自车在当前时刻的位置 The position of the vehicle at the current moment
+            curr_loc = data_dict['curr_loc']
+            simulated_states = list()
+            for index, obs_id in enumerate(submission_specs.get_sim_agent_ids(scenario)):
+                if obs_id not in predicted_obs_id_traj.keys(): # if it is not one of the agents to be predicted. then ignore it. 
+                    simulated_states.append(np.zeros(shape=(80, 4)))
+                else: # otherwise, simulate it
+                    one_predicted_obs_traj = predicted_obs_id_traj[obs_id]
+                    one_predicted_obs_x = one_predicted_obs_traj[:, 0]
+                    one_predicted_obs_y = one_predicted_obs_traj[:, 1]
+                    one_predicted_obs_z = np.array([float(logged_trajectories.z[:, -1][index])] * 80)
+                    one_predicted_obs_x, one_predicted_obs_y = MapUtil.local_to_global(curr_loc[2], one_predicted_obs_x,
+                                                                            one_predicted_obs_y, curr_loc[0], curr_loc[1])
+                    one_predicted_obs_heading = MapUtil.theta_local_to_global(curr_loc[2], one_predicted_obs_traj[:, 2])
+                    one_simulated_state = np.stack((one_predicted_obs_x, one_predicted_obs_y,
+                                                    one_predicted_obs_z, one_predicted_obs_heading), axis=-1)
+                    simulated_states.append(one_simulated_state)
+            simulated_states = np.stack(simulated_states, axis=0)
+            simulated_states = np.stack([simulated_states] * submission_specs.N_ROLLOUTS, axis=0)
+            simulated_states = tf.convert_to_tensor(simulated_states)
+
+
+            joint_scene = EvalUtil.joint_scene_from_states(simulated_states[0, :, :, :],
+                                                logged_trajectories.object_id)
+            # Validate the joint scene. Should raise an exception if it's invalid.
+            submission_specs.validate_joint_scene(joint_scene, scenario)
+            scenario_rollouts = EvalUtil.scenario_rollouts_from_states(
+                scenario, simulated_states, logged_trajectories.object_id)
+            # As before, we can validate the message we just generate.
+            submission_specs.validate_scenario_rollouts(scenario_rollouts, scenario)
+            # Compute the features for a single JointScene.
+            # single_scene_features = metric_features.compute_metric_features(
+            #     scenario, joint_scene)
+
+            ### Compute the metrics for the scenario rollouts ###
+            config = metrics.load_metrics_config_2()
+            scenario_metrics = metrics.compute_scenario_metrics_for_bundle(
+                config, scenario, scenario_rollouts)
+            print(scenario_metrics)
+            result_info.train_model_config.writer.add_text(f'validation/metrics', metrics, epoch_num*number_of_scenarios+idx)
+        
+
+
+
+
 
     @staticmethod
     def show_results_validation(model, result_info: LoadConfigResultDate, save_dir: str, epoch_num:int,number_of_scenarios: int=10):
@@ -187,6 +285,7 @@ class ShowResultsTask(BaseTask):
             # result_info.train_model_config.writer.add_figure(f'validation/ground_truth', fig, epoch_num)
             fig = ShowResultsTask.draw_scene(predicted_num, model_output, data_dict, scenario, os.path.join(save_dir, f"{index}_model_output.png"), return_fig=True)
             result_info.train_model_config.writer.add_figure(f'validation/model_output', fig, epoch_num)
+
     @staticmethod
     def draw_input(scenario: Scenario, image_path: str):
         fig, axis = plt.subplots(1, 1, figsize=(10, 10))
@@ -307,6 +406,139 @@ class ShowResultsTask(BaseTask):
         rect = patches.Rectangle(
             left_rear_global, length, width, angle=np.rad2deg(bbox_yaw), color=color)
         return rect
+
+    @staticmethod
+    def draw_gif_from_scenario(
+            predicted_num,scenario: Scenario, submission_specs, image_path: str, return_animations=False
+        ):
+        fig, axis = plt.subplots(1, 1, figsize=(10, 10))
+        
+        # Add map visualization
+        visualizations.add_map(axis, scenario)
+        
+        # Collect all the tracks that we want to visualize
+        tracks = [track for track in scenario.tracks if track.id in submission_specs.get_sim_agent_ids(scenario)]
+        
+        # Store trajectory points
+        x_list = []
+        y_list = []
+        width_list = []
+        length_list = []
+        for idx, track in enumerate(tracks):
+            if track.id in submission_specs.get_sim_agent_ids(scenario):
+            # if idx < predicted_num:
+                valids = np.array([state.valid for state in track.states])
+                if np.all(valids):
+                    x = np.array([state.center_x for i, state in enumerate(track.states)])
+                    y = np.array([state.center_y for i, state in enumerate(track.states)])
+                    width = np.array([state.width for i, state in enumerate(track.states)])
+                    length = np.array([state.length for i, state in enumerate(track.states)])
+                    x_list.append(x)
+                    y_list.append(y)
+                    width_list.append(width)
+                    length_list.append(length)
+        
+        # # Stack the x and y coordinates
+        x_list = np.stack(x_list, axis=0)
+        y_list = np.stack(y_list, axis=0)
+        width_list = np.stack(width_list, axis=0)
+        length_list = np.stack(length_list, axis=0)
+        # Function to animate the plotting of the tracks
+        def animate(t: int) -> list[patches.Rectangle]:
+            # Clear previous patches
+            for _ in range(len(axis.patches)):
+                axis.patches.pop()
+
+            bboxes = []
+            for j in range(len(x_list)):
+                # Plot a simple rectangle at the position of the track
+                bboxes.append(axis.add_patch(
+                    patches.Rectangle(
+                        (x_list[j, t], y_list[j, t]), width_list[j, t], length_list[j, t],
+                        color=ShowResultsTask.COLOR_DICT[j % len(ShowResultsTask.COLOR_DICT)], alpha=0.5
+                    )
+                ))
+            return bboxes
+
+        # Create the animation
+        animations = animation.FuncAnimation(
+            fig, animate, frames=x_list.shape[1], interval=100, blit=True
+        )
+
+        axis.set_xticks([])
+        axis.set_yticks([])
+
+        if return_animations:
+            return animations
+        
+        # Save the GIF
+        animations.save(image_path, writer='ffmpeg', fps=30)
+        plt.close('all')  # Avoid memory leak
+        print(f"{image_path} saved successfully")
+
+        return animations, fig
+
+    @staticmethod
+    def draw_gif_from_animated_states(
+        fig: plt.Figure, axis: plt.Axes, scenario: scenario_pb2.Scenario,
+        x: tf.Tensor, y: tf.Tensor, yaw: tf.Tensor, length: tf.Tensor,
+        width: tf.Tensor, color_idx: tf.Tensor, image_path: str, return_animations=False
+    ) -> animation.FuncAnimation:
+        """
+        Animates the states in a pyplot figure and saves it as a GIF.
+
+        Args:
+        fig: The pyplot figure to animate.
+        axis: The pyplot axis to which bounding boxes and map are added.
+        scenario: The Scenario proto from which the map is extracted.
+        x: Array of shape (num_objects, num_steps) of x-coordinates.
+        y: Array of shape (num_objects, num_steps) of y-coordinates.
+        yaw: Array of shape (num_objects, num_steps) of bounding box yaws.
+        length: Array of shape (num_objects, num_steps) of object lengths.
+        width: Array of shape (num_objects, num_steps) of object width.
+        color_idx: Array of shape (num_objects, num_steps) of color indices, picked
+            from the `WAYMO_COLORS` palette.
+        image_path: The file path to save the GIF.
+        return_animations: If True, return the animation object.
+
+        Returns:
+        An animation object if `return_animations` is True, otherwise saves a GIF.
+        """
+        # To avoid a double figure (one static and one animated), we need to first
+        # close the existing pyplot figure.
+        plt.close(fig)
+
+        # Add the static map features to the animation.
+        visualizations.add_map(axis, scenario)
+
+        def animate(t: int) -> list[patches.Rectangle]:
+            # At each animation step, we need to remove the existing patches.
+            for _ in range(len(axis.patches)):
+                axis.patches.pop()
+            
+            # Add bounding boxes of objects in the current time step
+            bboxes = visualizations.add_all_current_objects(
+                axis=axis, x=x[:, t], y=y[:, t], yaw=yaw[:, t], 
+                length=length[:, t], width=width[:, t], color_idx=color_idx[:, t]
+            )
+            return bboxes
+
+        # Create the animation
+        animations = animation.FuncAnimation(
+            fig, animate, frames=x.shape[1], interval=_ANIMATION_INTERVAL_MS, blit=True
+        )
+
+        axis.set_xticks([])
+        axis.set_yticks([])
+
+        # Save the animation as a GIF
+        if not return_animations:
+            animations.save(image_path, writer='ffmpeg', fps=30)
+            plt.close('all')  # Avoid memory leak
+            print(f"{image_path} saved successfully")
+        else:
+            return animations, fig
+
 
 if __name__ == "__main__":
     # show_result()
