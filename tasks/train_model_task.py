@@ -129,8 +129,17 @@ class TrainModelTask(BaseTask):
                     # Visualise the results
                     save_dir_path = os.path.join(result_info.task_config.gifs_dir, f'{epoch_num}-epoch') # create a folder with epoch number
                     os.makedirs(save_dir_path, exist_ok=True)
-                    # ShowResultsTask.show_results_validation(model=model, result_info=result_info, save_dir=save_dir_path, epoch_num=epoch_num,number_of_scenarios=3)
-                    ShowResultsTask.evaluate_metrics_validation(model=model, result_info=result_info, epoch_num=epoch_num, number_of_scenarios=3, print_verbose_comments=True)
+                    try: # don't stop the training if the visualisation fails
+                        ShowResultsTask.show_results_validation(model=model, result_info=result_info, save_dir=save_dir_path, epoch_num=epoch_num,number_of_scenarios=3)
+                        # If we have multiple gpus, we need to get the model from the DataParallel
+                        if self.multi_gpus:
+                            model_to_evaluate = model.module
+                        else:
+                            model_to_evaluate = model
+                        ShowResultsTask.evaluate_metrics_validation(model=model_to_evaluate, result_info=result_info, epoch_num=epoch_num, number_of_scenarios=3, print_verbose_comments=True)
+                    except Exception as e:
+                        print(e)
+
 
     @staticmethod
     def init_dirs(result_info: LoadConfigResultDate):

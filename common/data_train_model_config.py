@@ -8,6 +8,8 @@
 """
 from typing import List
 
+from tensorboard import summary
+from torch.utils.tensorboard import SummaryWriter
 from common.data import BaseConfig
 
 
@@ -35,3 +37,6 @@ class TrainModelConfig(BaseConfig):
     # saving model 
     save_model: bool = False
     save_interval_epoch: int = 10
+
+    # logs
+    writer: SummaryWriter = None

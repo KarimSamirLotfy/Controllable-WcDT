@@ -7,7 +7,9 @@
 @Date: 2024/1/6
 """
 from ast import List
+import json
 import os.path
+import re
 import shutil
 from typing import Any, Dict
 from unittest import result
@@ -15,6 +17,7 @@ from unittest import result
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.ops.math_ops import Sum
 import torch
 from matplotlib import animation
 from matplotlib import patches
@@ -37,11 +40,12 @@ from net_works import BackBone
 from tasks import BaseTask
 from utils import DataUtil, MathUtil, MapUtil
 from PIL import Image, ImageSequence
+from torch.utils.tensorboard import SummaryWriter
 RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
 DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
 VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
-MODEL_PATH = r"/home/k.lotfy/WcDT/investigate/normal_run_vs_teacher_forced/model/20241013-19-13-49_90670/epoch_180_batch_num_0_model.pth"
-
+MODEL_PATH = r"/home/k.lotfy/WcDT/output/model/20241018-00-09-19_60149/epoch_180_batch_num_0_model.pth"
+MODELS_DIR = r"/home/k.lotfy/WcDT/output/model/20241018-00-09-19_60149" # This does evaluation on differetn iterations of the smae model at different epochs.
 
 class ShowResultsTask(BaseTask):
     TASK_TYPE = TaskType.SHOW_RESULTS
@@ -70,8 +74,26 @@ class ShowResultsTask(BaseTask):
         if os.path.exists(RESULT_DIR):
             shutil.rmtree(RESULT_DIR)
         os.makedirs(RESULT_DIR, exist_ok=True)
-        # self.evaluate_metrics(result_info)
         self.show_result(result_info)
+        # Show Metrics for Model progress
+        # ShowResultsTask.evaluate_all_models(MODELS_DIR, result_info)
+
+    @staticmethod
+    def evaluate_all_models(model_dir, result_info):
+        epoch_pattern = re.compile(r'epoch_(\d+)_batch_num_0_model\.pth')
+        for file_name in os.listdir(model_dir):
+            match = epoch_pattern.match(file_name)
+            if match:
+                epoch_num = int(match.group(1))
+                model_path = os.path.join(model_dir, file_name)
+                MODEL_PATH = model_path
+                model = ShowResultsTask.load_pretrain_model(result_info)
+                evaluation_result = ShowResultsTask.evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=3, print_verbose_comments=False)
+                print(f"Evaluation result for {file_name} (Epoch {epoch_num}): \n{evaluation_result}")
+                # in showresults folder. create a json file for each and dump it
+                with open(os.path.join(RESULT_DIR, f"{epoch_num}_evaluation.json"), 'w') as f:
+                    f.write(json.dumps(evaluation_result, indent=4))
+
 
     @staticmethod
     def load_pretrain_model(result_info: LoadConfigResultDate) -> BackBone:
@@ -124,34 +146,35 @@ class ShowResultsTask(BaseTask):
             real_yaw = torch.cat((predicted_his_traj, predicted_future_traj), dim=1)[:, :, 2].detach().numpy()
             model_output = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, :2].detach().numpy()
             model_yaw = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, 2].detach().numpy()
-            # # 可视化输入
+            # 可视化输入
             # image_path = os.path.join(RESULT_DIR, f"{index}_input.png")
             # self.draw_input(scenario, image_path)
-            # # 可视化ground truth
+            # 可视化ground truth
             # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
             # self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
             # # 可视化model output
             # image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
             # self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
-            # # 可视化ground truth
+            # 可视化ground truth
             # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
             # self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
             # # 可视化model output
             # image_path = os.path.join(RESULT_DIR, f"{index}_model_output.png")
             # self.draw_scene(predicted_num, model_output, data_dict, scenario, image_path)
-            # # GIFS
-            # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.gif")
-            # self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
-            # image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
-            # self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
+            # GIFS
+            image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.gif")
+            self.draw_gif(predicted_num, real_traj, real_yaw, data_dict, scenario, image_path)
+            image_path = os.path.join(RESULT_DIR, f"{index}_model_output.gif")
+            self.draw_gif(predicted_num, model_output, model_yaw, data_dict, scenario, image_path)
             image_path = os.path.join(RESULT_DIR, f"{index}_scenario.gif")
             self.draw_gif_from_scenario(predicted_num,scenario, submission_specs, image_path)
-
 
 
     @staticmethod
     def evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=3, print_verbose_comments=True): 
         vprint = print if print_verbose_comments else lambda arg: None
+        # get the device to use from result_info
+        device = next(model.parameters()).device
 
         ### READ VALIDATION DATA
         match_filenames = tf.io.matching_files([VALIDATION_DATA_SET_PATH])
@@ -165,7 +188,7 @@ class ShowResultsTask(BaseTask):
             data_dict = DataUtil.transform_data_to_input(scenario, result_info)
             for key, value in data_dict.items():
                 if isinstance(value, torch.Tensor):
-                    data_dict[key] = value.to(torch.float32).unsqueeze(dim=0)
+                    data_dict[key] = value.to(torch.float32).unsqueeze(dim=0).to(device)
 
             ### Data prepratation done
 
@@ -232,7 +255,7 @@ class ShowResultsTask(BaseTask):
             config = metrics.load_metrics_config_2()
             scenario_metrics = metrics.compute_scenario_metrics_for_bundle(
                 config, scenario, scenario_rollouts)
-            print(scenario_metrics)
+            vprint(scenario_metrics)
             logs = {
                 'metametric': scenario_metrics.metametric,
                 'linear_acceleration_likelihood': scenario_metrics.linear_acceleration_likelihood,
@@ -247,10 +270,18 @@ class ShowResultsTask(BaseTask):
                 'angular_speed_likelihood': scenario_metrics.angular_speed_likelihood,
                 'angular_acceleration_likelihood': scenario_metrics.angular_acceleration_likelihood
             }
+
+            if result_info.train_model_config.writer is None:
+                vprint("No tensorboard writer found. creating new writer")
+                # result_info.train_model_config.writer = SummaryWriter(result_info.train_model_config.log_dir)
+                return logs
             writer = result_info.train_model_config.writer
             for key, value in logs.items():
                 writer.add_scalar(f'metrics/{key}', value, epoch_num*number_of_scenarios+index)
 
+            # flush the writer
+            writer.flush()
+            vprint(f"Scenario {index} metrics: {logs}")
 
 
 

@@ -1,7 +1,7 @@
 task_config:
   task_list:
-#    - "DATA_PREPROCESS"
-#    - "DATA_SPLIT"
+  #  - "DATA_PREPROCESS"
+  #  - "DATA_SPLIT"
   #  - "DATA_COUNT"
    - "TRAIN_MODEL"
   #  - "SHOW_RESULTS"
@@ -15,9 +15,9 @@ task_config:
   model_dir: "model"
   result_dir: "result"
   pre_train_model: ""
-  waymo_train_dir: ""
-  waymo_val_dir: ""
-  waymo_test_dir: ""
+  waymo_train_dir: "/home/data/womd/scenario/training"
+  waymo_val_dir: "/home/data/womd/scenario/validation"
+  waymo_test_dir: "/home/data/womd/scenario/testing"
   # 数据预处理和打包的输出总目录
   data_output: "data_output"
   data_preprocess_dir: "data_preprocess_dir"
@@ -30,16 +30,16 @@ task_config:
 
 data_preprocess_config:
   data_size: 100
-  max_data_size: 2000
+  max_data_size: 500000
   num_works: 20
 
 
 train_model_config:
-  use_gpu: False
+  use_gpu: True
   gpu_ids:
     - 0
     - 1
-  batch_size: 4
+  batch_size: 512
   num_works: 0
   his_step: 11
   max_pred_num: 8
@@ -53,12 +53,12 @@ train_model_config:
   time_steps: 50
   # cosine or linear
   schedule: "linear"
-  num_epoch: 200
+  num_epoch: 100
   init_lr: 0.0001
   # training
-  teacher_forcing: True # Use grout truth for scence encoding not the samled diffusion path. makes training faster
+  teacher_forcing: False # Use grout truth for scence encoding not the samled diffusion path. makes training faster
 
   # saveing model
   save_model: True
-  save_interval_epoch: 50 #also is the visulzation interval. 
+  save_interval_epoch: 10 #also is the visulzation interval. 
 

@@ -1,1 +1,1 @@
-nohup python3 -u main.py >> diff_run.log &
+nohup python3 -u main.py >> trial_run.log &
