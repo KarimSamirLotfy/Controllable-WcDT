@@ -44,7 +44,7 @@ from torch.utils.tensorboard import SummaryWriter
 RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
 DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
 VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
-MODEL_PATH = r"/home/k.lotfy/WcDT/output/model/20241018-00-09-19_60149/epoch_180_batch_num_0_model.pth"
+MODEL_PATH = r"/home/k.lotfy/WcDT/investigate/baseline-10x-run/output_big_run_10x/model/20241018-00-09-19_60149/epoch_180_batch_num_0_model.pth"
 MODELS_DIR = r"/home/k.lotfy/WcDT/output/model/20241018-00-09-19_60149" # This does evaluation on differetn iterations of the smae model at different epochs.
 
 class ShowResultsTask(BaseTask):
@@ -147,8 +147,8 @@ class ShowResultsTask(BaseTask):
             model_output = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, :2].detach().numpy()
             model_yaw = torch.cat((predicted_his_traj, generate_traj), dim=1)[:, :, 2].detach().numpy()
             # 可视化输入
-            # image_path = os.path.join(RESULT_DIR, f"{index}_input.png")
-            # self.draw_input(scenario, image_path)
+            image_path = os.path.join(RESULT_DIR, f"{index}_input.png")
+            self.draw_input(scenario, image_path)
             # 可视化ground truth
             # image_path = os.path.join(RESULT_DIR, f"{index}_ground_truth.png")
             # self.draw_scene(predicted_num, real_traj, data_dict, scenario, image_path)
@@ -169,6 +169,7 @@ class ShowResultsTask(BaseTask):
             image_path = os.path.join(RESULT_DIR, f"{index}_scenario.gif")
             self.draw_gif_from_scenario(predicted_num,scenario, submission_specs, image_path)
 
+            
 
     @staticmethod
     def evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=3, print_verbose_comments=True): 
