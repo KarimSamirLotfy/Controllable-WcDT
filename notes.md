@@ -65,13 +65,17 @@ time_per_seconds = 0.026*batch_size
         * My idea. as you sample each step, you woudl forward propagate the entire thing accting as if the entire thing is just 1 MLP that maps from beahvior to output. then prepagate the output back
         * Dissucuss what would be a good result to have. this will not need any trianing. but will need a lot of enginnering to get right. still need also to look at energy based models
 
-evalids = 1, 2, 3, 4
- 1, 3, 4
+# TODO Tasks
+[] Do quick run comapring diffusion model and non diffuison model. to actually see how important this is. 
+[] Fix metrics
+    * increase number of max_predicted
+    * edit scenario before giving it in
+    * implement the metrics yourself
+[]  Add sampling condigitning 
+[] actually pray that this works properly
 
 * Get the sze of the dataset
  ## Min effort
  * increate number of prediceted
  * edit scenario.... somehow. hackit 
  * implement the metrics. 
-
- ## compare diffsion with none diffusion 

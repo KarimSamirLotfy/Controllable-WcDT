@@ -15,3 +15,4 @@ data_output/*
 investigate/*
 output_big_run_10x/*
 show_results/*
+output_*/*

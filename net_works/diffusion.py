@@ -244,7 +244,7 @@ class GaussianDiffusion(nn.Module):
             diffusion_loss = torch.sum(diffusion_loss * diffusion_loss_mask) / torch.sum(diffusion_loss_mask)
             return diffusion_loss
         else:
-            return torch.tensor(0).to(torch.float32)
+            return torch.tensor(0).to(torch.float32).to(predicted_his_traj.device)
 
     def forward(self, data: dict):
         # batch, pred_obs(8), his_step, 3
