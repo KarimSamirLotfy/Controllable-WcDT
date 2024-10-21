@@ -33,3 +33,45 @@ And this could lead to expolits with the secruity team. so removeed the anaconda
 [ ] get the eval code. 
 [] decidec on to keep the arch or not. 
 # also ask for more space. Run ID: 
+
+# Time needed now
+* 50000 samples, 512 batch size, 2 GPUs, Teacher_forced=True. 100 epochs => 13hrs
+    * 98 batches
+    * 1 batch = 4.7 seconds on 2 GPUS
+    * 1 batch = 9.4 seconds on 1 GPU
+    * num_batches * 9.4 * num_epochs / num_gpu = seconds == num_hrs*60*60
+
+* 50000, 256 batch size, 1 gpu, Teacher_forced=True, 200 epochs => 
+    * 196
+    * 1 batch = 3 seconds on 1 GPU
+    
+f(batch_szie) = time_per_second
+f(256) = 3s
+f(512) = 9.4
+m = 0.026
+b = -3.656
+time_per_seconds = 0.026*batch_size
+
+# Meeting ponts
+* Metrics issue. 
+* without quanititative results. it is hard to judge. 
+* 10x Dataset definelty improved losses. except of the confidence loss. 
+* Maybe mix the teacher force with none. get best of both words
+
+* Next step
+    1. Start adding query centric
+    2. or go for the sampling based techniques
+        * so for the paper. try to see if the agent tokens really do change the behavior. 
+        * My idea. as you sample each step, you woudl forward propagate the entire thing accting as if the entire thing is just 1 MLP that maps from beahvior to output. then prepagate the output back
+        * Dissucuss what would be a good result to have. this will not need any trianing. but will need a lot of enginnering to get right. still need also to look at energy based models
+
+evalids = 1, 2, 3, 4
+ 1, 3, 4
+
+* Get the sze of the dataset
+ ## Min effort
+ * increate number of prediceted
+ * edit scenario.... somehow. hackit 
+ * implement the metrics. 
+
+ ## compare diffsion with none diffusion 

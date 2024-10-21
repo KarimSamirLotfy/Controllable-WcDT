@@ -88,7 +88,7 @@ class ShowResultsTask(BaseTask):
                 model_path = os.path.join(model_dir, file_name)
                 MODEL_PATH = model_path
                 model = ShowResultsTask.load_pretrain_model(result_info)
-                evaluation_result = ShowResultsTask.evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=3, print_verbose_comments=False)
+                evaluation_result = ShowResultsTask.evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=5, print_verbose_comments=False)
                 print(f"Evaluation result for {file_name} (Epoch {epoch_num}): \n{evaluation_result}")
                 # in showresults folder. create a json file for each and dump it
                 with open(os.path.join(RESULT_DIR, f"{epoch_num}_evaluation.json"), 'w') as f:
