@@ -136,6 +136,7 @@ class TrainModelTask(BaseTask):
                             model_to_evaluate = model.module
                         else:
                             model_to_evaluate = model
+                            # TODO: Fix the metrics and uncomment this line
                         ShowResultsTask.evaluate_metrics_validation(model=model_to_evaluate, result_info=result_info, epoch_num=epoch_num, number_of_scenarios=3, print_verbose_comments=True)
                     except Exception as e:
                         print(e)

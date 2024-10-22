@@ -271,7 +271,7 @@ class ShowResultsTask(BaseTask):
                 'angular_speed_likelihood': scenario_metrics.angular_speed_likelihood,
                 'angular_acceleration_likelihood': scenario_metrics.angular_acceleration_likelihood
             }
-
+            
             if result_info.train_model_config.writer is None:
                 vprint("No tensorboard writer found. creating new writer")
                 # result_info.train_model_config.writer = SummaryWriter(result_info.train_model_config.log_dir)

@@ -8,7 +8,7 @@ task_config:
 #    - "EVAL_MODEL"
 #    - "GENE_SUBMISSION"
   # 程序执行过程中的输出总目录
-  output_dir: "output_no_diffusion_10x_run"
+  output_dir: "output_no_teacher_forcing_10x_run"
   log_dir: "log"
   image_dir: "result_image"
   gifs_dir: "result_gifs"
@@ -35,11 +35,11 @@ data_preprocess_config:
 
 
 train_model_config:
-  use_gpu: True
+  use_gpu: False
   gpu_ids:
     - 0
-    # - 1
-  batch_size: 256
+    - 1
+  batch_size: 4
   num_works: 0
   his_step: 11
   max_pred_num: 8
@@ -55,7 +55,7 @@ train_model_config:
   schedule: "linear"
   num_epoch: 100
   init_lr: 0.0001
-  diffusion_type: none # dit, unet, none (None for no diffusion at all)
+  diffusion_type: dit # dit, unet, none (None for no diffusion at all)
 
   # training
   teacher_forcing: False # Use grout truth for scence encoding not the samled diffusion path. makes training faster
