@@ -155,7 +155,7 @@ class DataUtil:
             obs_feature += type_onehot
             obs_feature_list.append(obs_feature)
             # 记录predicted_obs的索引
-            if one_obs_info['obs_id'] in predicted_obs_ids:
+            if one_obs_info['obs_id'] in predicted_obs_ids: # ! This is the issue. 
                 predicted_obs_index.append(index)
             traj = np.array(one_obs_info['obs_traj'])
             traj_list.append(traj)
