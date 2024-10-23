@@ -54,6 +54,8 @@ class TrainModelTask(BaseTask):
             train_model_config.max_other_num, train_model_config.max_traffic_light,
             train_model_config.max_lane_num, train_model_config.max_point_num
         )
+        if train_model_config.overfit_batches > 0:
+            waymo_dataset = torch.utils.data.Subset(waymo_dataset, list(range(train_model_config.overfit_batches * train_model_config.batch_size)))
         data_loader = DataLoader(
             waymo_dataset,
             shuffle=True,
@@ -67,6 +69,8 @@ class TrainModelTask(BaseTask):
         optimizer = optim.Adam(model_train.parameters(), lr=train_model_config.init_lr,
                                betas=(0.9, 0.999), weight_decay=0)
         epoch_step = len(waymo_dataset) // train_model_config.batch_size
+        if train_model_config.overfit_batches > 0:
+            epoch_step = min(epoch_step, train_model_config.overfit_batches)
         if epoch_step == 0:
             raise ValueError("dataset is too small, epoch_step = 0")
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, train_model_config.num_epoch, eta_min=1e-6)
@@ -126,18 +130,21 @@ class TrainModelTask(BaseTask):
                     model_save_path = os.path.join(result_info.task_config.model_dir,
                                                    f"epoch_{epoch_num}_batch_num_{iteration}_model.pth")
                     torch.save(model.state_dict(), model_save_path)
+            if result_info.train_model_config.vis_interval_epoch > 0:
+                if epoch_num % result_info.train_model_config.vis_interval_epoch == 0 and iteration == 0:
                     # Visualise the results
                     save_dir_path = os.path.join(result_info.task_config.gifs_dir, f'{epoch_num}-epoch') # create a folder with epoch number
                     os.makedirs(save_dir_path, exist_ok=True)
+                    number_of_samples = result_info.train_model_config.samples_to_visualize
                     try: # don't stop the training if the visualisation fails
-                        ShowResultsTask.show_results_validation(model=model, result_info=result_info, save_dir=save_dir_path, epoch_num=epoch_num,number_of_scenarios=3)
+                        ShowResultsTask.show_results_validation(model=model, result_info=result_info, save_dir=save_dir_path, epoch_num=epoch_num,number_of_scenarios=number_of_samples)
                         # If we have multiple gpus, we need to get the model from the DataParallel
                         if self.multi_gpus:
                             model_to_evaluate = model.module
                         else:
                             model_to_evaluate = model
                             # TODO: Fix the metrics and uncomment this line
-                        ShowResultsTask.evaluate_metrics_validation(model=model_to_evaluate, result_info=result_info, epoch_num=epoch_num, number_of_scenarios=3, print_verbose_comments=True)
+                        ShowResultsTask.evaluate_metrics_validation(model=model_to_evaluate, result_info=result_info, epoch_num=epoch_num, number_of_scenarios=number_of_samples, print_verbose_comments=True)
                     except Exception as e:
                         print(e)
 

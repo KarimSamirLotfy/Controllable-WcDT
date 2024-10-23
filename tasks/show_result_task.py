@@ -243,14 +243,14 @@ class ShowResultsTask(BaseTask):
             # 自车在当前时刻的位置 The position of the vehicle at the current moment
             curr_loc = data_dict['curr_loc']
             simulated_states = list()
-            for index, obs_id in enumerate(all_ids):
+            for idx, obs_id in enumerate(all_ids):
                 if obs_id not in predicted_obs_id_traj.keys(): # if it is not one of the agents to be predicted. then ignore it. 
                     simulated_states.append(np.zeros(shape=(80, 4)))
                 else: # otherwise, simulate it
                     one_predicted_obs_traj = predicted_obs_id_traj[obs_id]
                     one_predicted_obs_x = one_predicted_obs_traj[:, 0]
                     one_predicted_obs_y = one_predicted_obs_traj[:, 1]
-                    one_predicted_obs_z = np.array([float(logged_trajectories.z[:, -1][index])] * 80)
+                    one_predicted_obs_z = np.array([float(logged_trajectories.z[:, -1][idx])] * 80)
                     one_predicted_obs_x, one_predicted_obs_y = MapUtil.local_to_global(curr_loc[2], one_predicted_obs_x,
                                                                             one_predicted_obs_y, curr_loc[0], curr_loc[1])
                     one_predicted_obs_heading = MapUtil.theta_local_to_global(curr_loc[2], one_predicted_obs_traj[:, 2])
