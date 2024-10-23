@@ -314,13 +314,14 @@ class ShowResultsTask(BaseTask):
         # Save the metrics to a csv file
         os.makedirs(f'{RESULT_DIR}/metrics', exist_ok=True)
         metrics_df.to_csv(os.path.join(f'{RESULT_DIR}/metrics', f"metrics_{epoch_num}.csv") )
+        metrics_df.to_csv(os.path.join(f'{result_info.task_config.result_dir}', f"metrics_{epoch_num}.csv") )
 
         # aggregate the metrics via mean and print them
         print(f"Aggregated metrics for epoch {epoch_num}:")
         aggretgate = metrics_df.mean()
         print(aggretgate)
         aggretgate.to_csv(os.path.join(f'{RESULT_DIR}/metrics', f"metrics_aggregated_{epoch_num}.csv") )
-
+        aggretgate.to_csv(os.path.join(f'{result_info.task_config.result_dir}', f"metrics_aggregated_{epoch_num}.csv") )
 
 
 
