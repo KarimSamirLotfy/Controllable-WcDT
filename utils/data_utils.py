@@ -398,13 +398,11 @@ class DataUtil:
             pkl_data = DataUtil.split_pkl_data_for_training(data_dict, his_step)
         all_obs_index = set([i for i in range(pkl_data[1].shape[0])])
         predicted_index = torch.Tensor(pkl_data[0]).to(torch.long).view(-1, 1, 1)
-        print(all_obs_index, predicted_index.flatten())
         all_obs_traj = torch.Tensor(pkl_data[1])
         all_obs_feature = torch.Tensor(pkl_data[2])
         all_obs_his_traj = all_obs_traj[:, :his_step]
         all_obs_future_traj = all_obs_traj[:, his_step:]
         other_obs_index = list(all_obs_index - set(pkl_data[0]))
-        print(f'all_obs_traj:{all_obs_traj.shape}, all_obs_feature:{all_obs_feature.shape}, all_obs_his_traj:{all_obs_his_traj.shape}, all_obs_future_traj:{all_obs_future_traj.shape}')
         # 获取障碍物信息
         other_his_traj, other_feature, other_traj_mask = cls.get_obs_feature(
             config_data, other_obs_index, all_obs_his_traj, all_obs_feature
