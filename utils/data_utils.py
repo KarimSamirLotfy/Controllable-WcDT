@@ -33,12 +33,19 @@ class DataUtil:
         ego_curr_heading = curr_state.heading
         # 需要预测的障碍物id
         predicted_obs_ids = submission_specs.get_evaluation_sim_agent_ids(scenario)
+        all_simulated_ids = submission_specs.get_sim_agent_ids(scenario)
+        predicted_obs_index = [all_simulated_ids.index(item) for item in predicted_obs_ids] # The index of the predicted agents in the simulated agents.
+        # Create a mapper dict from index to id.
+        mapper_predicted_obs_index_to_id = {index: id for index, id in zip(predicted_obs_index, predicted_obs_ids)}
         obs_tracks = cls.load_obs_tracks(scenario, ego_curr_x, ego_curr_y, ego_curr_heading)
         map_features = cls.load_map_features(scenario, ego_curr_x, ego_curr_y, ego_curr_heading)
         traffic_lights = cls.load_traffic_light(scenario, ego_curr_x, ego_curr_y, ego_curr_heading)
         if len(obs_tracks) <= 1:
             return result_dict
         result_dict['predicted_obs_ids'] = predicted_obs_ids
+        result_dict['all_simulated_ids'] = all_simulated_ids
+        result_dict['predicted_obs_index'] = predicted_obs_index
+        result_dict['mapper_predicted_obs_index_to_id'] = mapper_predicted_obs_index_to_id
         result_dict['obs_tracks'] = obs_tracks
         result_dict['map_features'] = map_features
         result_dict['dynamic_states'] = traffic_lights
@@ -197,7 +204,56 @@ class DataUtil:
                         obs_feature_list, dynamic_states,
                         dynamic_pos, map_points)
         return one_pkl_data
+    
+    @staticmethod
+    def split_pkl_data_for_evaluation(one_pkl_dict: Dict[str, Any], his_step: int, test_data=True) -> Tuple:
+        """
+            This function loads the data that need to be loaded. it gets from the submission specs the ids of the agents that need to be predicted.
+        """
+        map_points = [feature['polygon_points'] for feature in one_pkl_dict['map_features']]
+        predicted_obs_ids = one_pkl_dict['predicted_obs_ids'] # ID's to be evaluated. usally the ones with least noise
+        all_simulated_ids = one_pkl_dict['all_simulated_ids'] # ALL ID's that are simulated, any trajcetory not in these should be ignored. 
+        predicted_obs_index = one_pkl_dict['predicted_obs_index']
 
+        # 初始化需要保存的信息
+        index = 0
+        traj_list = list()
+        obs_feature_list = list()
+        # 障碍物信息
+        for one_obs_info in one_pkl_dict['obs_tracks']:
+            if one_obs_info['obs_id'] not in all_simulated_ids: # If this observation is not one that should be simulated. Then ignore it. 
+                continue
+            # 障碍物size和type
+            obs_feature = list()
+            obs_feature.append(one_obs_info['width'])
+            obs_feature.append(one_obs_info['length'])
+            type_onehot = [0] * len(ObjectType)
+            type_onehot[one_obs_info['object_type']] = 1
+            obs_feature += type_onehot
+            obs_feature_list.append(obs_feature)
+            traj = np.array(one_obs_info['obs_traj'])
+            traj_list.append(traj)
+            index += 1
+        if len(predicted_obs_index) < 1:
+            return tuple()
+        # 动态地图信息
+        dynamic_states = list()
+        dynamic_pos = list()
+        for key, value in one_pkl_dict['dynamic_states'].items():
+            dynamic_pos.append(value[0])
+            dynamic_state = value[1:]
+            dynamic_state = dynamic_state[:his_step]
+            if len(dynamic_state) < his_step:
+                dynamic_state = dynamic_state + ([0] * (his_step - len(dynamic_state)))
+            dynamic_states.append(dynamic_state)
+        traj_arr = np.stack(traj_list, axis=0)
+        obs_feature_list = np.stack(obs_feature_list, axis=0)
+        dynamic_states = np.array(dynamic_states)
+        dynamic_pos = np.array(dynamic_pos)
+        one_pkl_data = (predicted_obs_index, traj_arr,
+                        obs_feature_list, dynamic_states,
+                        dynamic_pos, map_points)
+        return one_pkl_data
     @staticmethod
     def get_obs_feature(
             config_data: LoadConfigResultDate,
@@ -331,12 +387,15 @@ class DataUtil:
 
     @classmethod
     def transform_data_to_input(cls, scenario: scenario_pb2.Scenario,
-                                config_data: LoadConfigResultDate) -> Dict[str, Any]:
+                                config_data: LoadConfigResultDate, evaluation_data=False) -> Dict[str, Any]:
         data_dict = cls.load_scenario_data(scenario)
         if len(data_dict) == 0:
             return dict()
         his_step = config_data.train_model_config.his_step
-        pkl_data = DataUtil.split_pkl_data_for_training(data_dict, his_step)
+        if evaluation_data:
+            pkl_data = DataUtil.split_pkl_data_for_evaluation(data_dict, his_step)
+        else:
+            pkl_data = DataUtil.split_pkl_data_for_training(data_dict, his_step)
         all_obs_index = set([i for i in range(pkl_data[1].shape[0])])
         predicted_index = torch.Tensor(pkl_data[0]).to(torch.long).view(-1, 1, 1)
         print(all_obs_index, predicted_index.flatten())
@@ -369,6 +428,9 @@ class DataUtil:
         other_his_pos = other_his_traj[:, -1, :2]
         predicted_his_traj_delt = predicted_his_traj[:, 1:] - predicted_his_traj[:, :-1]
         predicted_his_pos = predicted_his_traj[:, -1, :2]
+
+        # mapper from index to id
+        mapper_predicted_obs_index_to_id = data_dict['mapper_predicted_obs_index_to_id']
         result = {
             "other_his_traj": other_his_traj,
             "other_feature": other_feature,
@@ -387,6 +449,7 @@ class DataUtil:
             "lane_list": lane_list,
             "map_json": map_json,
             "curr_loc": data_dict['curr_loc'],
-            "predicted_obs_index": predicted_index
+            "predicted_obs_index": predicted_index,
+            'mapper_predicted_obs_index_to_id':mapper_predicted_obs_index_to_id
         }
         return result

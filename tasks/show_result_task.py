@@ -16,6 +16,7 @@ from unittest import result
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from tensorflow.python.ops.math_ops import Sum
 import torch
@@ -74,10 +75,11 @@ class ShowResultsTask(BaseTask):
         if os.path.exists(RESULT_DIR):
             shutil.rmtree(RESULT_DIR)
         os.makedirs(RESULT_DIR, exist_ok=True)
-        self.show_result(result_info)
+        NUM_OF_SAMPLES = 100
+        self.show_result(result_info, max_dataset=NUM_OF_SAMPLES)
         # Show Metrics for Model progress
-        # ShowResultsTask.evaluate_all_models(MODELS_DIR, result_info)
-
+        self.evaluate_metrics(result_info, number_of_scenarios=NUM_OF_SAMPLES)
+        
     @staticmethod
     def evaluate_all_models(model_dir, result_info):
         epoch_pattern = re.compile(r'epoch_(\d+)_batch_num_0_model\.pth')
@@ -119,10 +121,10 @@ class ShowResultsTask(BaseTask):
         print("load_pretrain_model success")
         return model
 
-    def show_result(self, result_info: LoadConfigResultDate):
+    def show_result(self, result_info: LoadConfigResultDate, max_dataset=100):
         model = self.load_pretrain_model(result_info)
         match_filenames = tf.io.matching_files([DATA_SET_PATH])
-        dataset = tf.data.TFRecordDataset(match_filenames, name="train_data").take(100)
+        dataset = tf.data.TFRecordDataset(match_filenames, name="train_data").take(max_dataset)
         dataset_iterator = dataset.as_numpy_iterator()
         for index, scenario_bytes in enumerate(dataset_iterator):
             scenario = scenario_pb2.Scenario.FromString(scenario_bytes)
@@ -170,12 +172,20 @@ class ShowResultsTask(BaseTask):
             self.draw_gif_from_scenario(predicted_num,scenario, submission_specs, image_path)
 
             
-
+    
+    def evaluate_metrics(self, result_info, number_of_scenarios=5):
+        # get a model
+        model = self.load_pretrain_model(result_info)
+        # evaluate the model
+        self.evaluate_metrics_validation(model, result_info, 0, number_of_scenarios=number_of_scenarios, print_verbose_comments=True)
+    
     @staticmethod
     def evaluate_metrics_validation(model, result_info, epoch_num, number_of_scenarios=3, print_verbose_comments=True): 
         vprint = print if print_verbose_comments else lambda arg: None
         # get the device to use from result_info
         device = next(model.parameters()).device
+        # log for the metrics to aggregate them
+        metrics_logs = []
 
         ### READ VALIDATION DATA
         match_filenames = tf.io.matching_files([VALIDATION_DATA_SET_PATH])
@@ -192,8 +202,10 @@ class ShowResultsTask(BaseTask):
             print(all_ids, len(all_ids))
             print(eval_ids, len(eval_ids))
             print(f'index_of_eval_ids: {[all_ids.index(item) for item in eval_ids]}')
-
-            data_dict = DataUtil.transform_data_to_input(scenario, result_info)
+            if len(eval_ids) == 0 or len(eval_ids) > result_info.train_model_config.max_pred_num:
+                vprint(f"Scenario {index} with ID {scenario.scenario_id} has {len(eval_ids)} agents to predict. Skipping")
+                continue
+            data_dict = DataUtil.transform_data_to_input(scenario, result_info, evaluation_data=True)
             for key, value in data_dict.items():
                 if isinstance(value, torch.Tensor):
                     data_dict[key] = value.to(torch.float32).unsqueeze(dim=0).to(device)
@@ -224,11 +236,14 @@ class ShowResultsTask(BaseTask):
             predicted_obs_traj = predicted_obs_traj.cpu().detach().numpy()
 
             ### PUT into siumlation format of (x, y, z, heading) ### Do this via extrapolation
-            predicted_obs_id_traj = {obs_id: predicted_obs_traj[index] for index, obs_id in enumerate(data_dict['predicted_obs_index'].flatten().cpu().detach().numpy())}
+            ## Map each ID to it's prediction or default to 0,0,0,0
+            # data_dict['predicted_obs_index'] maps the index of the model output to the index of the trajectory
+            mapper_predicted_obs_index_to_id = data_dict['mapper_predicted_obs_index_to_id']
+            predicted_obs_id_traj = {mapper_predicted_obs_index_to_id[int(trajectory_index_in_input)]: predicted_obs_traj[output_index] for output_index, trajectory_index_in_input in enumerate(data_dict['predicted_obs_index'].flatten().cpu().detach().numpy())}
             # 自车在当前时刻的位置 The position of the vehicle at the current moment
             curr_loc = data_dict['curr_loc']
             simulated_states = list()
-            for index, obs_id in enumerate(submission_specs.get_sim_agent_ids(scenario)):
+            for index, obs_id in enumerate(all_ids):
                 if obs_id not in predicted_obs_id_traj.keys(): # if it is not one of the agents to be predicted. then ignore it. 
                     simulated_states.append(np.zeros(shape=(80, 4)))
                 else: # otherwise, simulate it
@@ -264,7 +279,7 @@ class ShowResultsTask(BaseTask):
             scenario_metrics = metrics.compute_scenario_metrics_for_bundle(
                 config, scenario, scenario_rollouts)
             vprint(scenario_metrics)
-            logs = {
+            metric_log = {
                 'metametric': scenario_metrics.metametric,
                 'linear_acceleration_likelihood': scenario_metrics.linear_acceleration_likelihood,
                 'time_to_collision_likelihood': scenario_metrics.time_to_collision_likelihood,
@@ -281,15 +296,30 @@ class ShowResultsTask(BaseTask):
 
             if result_info.train_model_config.writer is None:
                 vprint("No tensorboard writer found. creating new writer")
-                # result_info.train_model_config.writer = SummaryWriter(result_info.train_model_config.log_dir)
-                return logs
+                result_info.train_model_config.writer = SummaryWriter(result_info.task_config.tensorboard_dir)
+
             writer = result_info.train_model_config.writer
-            for key, value in logs.items():
+            for key, value in metric_log.items():
                 writer.add_scalar(f'metrics/{key}', value, epoch_num*number_of_scenarios+index)
 
             # flush the writer
             writer.flush()
-            vprint(f"Scenario {index} metrics: {logs}")
+            # append the metrics to the logs
+            metrics_logs.append(metric_log)
+            vprint(f"Scenario {index} metrics: {metric_log}")
+        
+        # Put metrics in a pandas dataframe
+        metrics_df = pd.DataFrame(metrics_logs)
+        print(metrics_df)
+        # Save the metrics to a csv file
+        os.makedirs(f'{RESULT_DIR}/metrics', exist_ok=True)
+        metrics_df.to_csv(os.path.join(f'{RESULT_DIR}/metrics', f"metrics_{epoch_num}.csv") )
+
+        # aggregate the metrics via mean and print them
+        print(f"Aggregated metrics for epoch {epoch_num}:")
+        aggretgate = metrics_df.mean()
+        print(aggretgate)
+        aggretgate.to_csv(os.path.join(f'{RESULT_DIR}/metrics', f"metrics_aggregated_{epoch_num}.csv") )
 
 
 
@@ -335,6 +365,9 @@ class ShowResultsTask(BaseTask):
             fig = ShowResultsTask.draw_scene(predicted_num, model_output, data_dict, scenario, os.path.join(save_dir, f"{index}_model_output.png"), return_fig=True)
             result_info.train_model_config.writer.add_figure(f'validation/model_output', fig, epoch_num)
 
+
+
+    ### UTILS ###
     @staticmethod
     def draw_input(scenario: Scenario, image_path: str):
         fig, axis = plt.subplots(1, 1, figsize=(10, 10))
