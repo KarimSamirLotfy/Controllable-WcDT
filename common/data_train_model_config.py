@@ -17,6 +17,7 @@ class TrainModelConfig(BaseConfig):
     use_gpu: bool = True
     gpu_ids: List[int] = [1]
     batch_size: int = 8
+    overfit_batches: int = 0
     num_works: int = 20
     his_step: int = 11
     max_pred_num: int = 8
@@ -40,3 +41,7 @@ class TrainModelConfig(BaseConfig):
 
     # logs
     writer: SummaryWriter = None
+
+    # visualization
+    vis_interval_epoch: int = 10
+    samples_to_visualize: int = 5

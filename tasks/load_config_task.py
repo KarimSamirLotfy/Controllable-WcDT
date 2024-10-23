@@ -110,8 +110,6 @@ class LoadConfigTask(BaseTask):
         # 创建model save dir
         # task_config.model_dir = os.path.join(task_config.output_dir, task_config.model_dir)
         # os.makedirs(task_config.model_dir, exist_ok=True)
-        # 创建result dir
-        task_config.result_dir = os.path.join(task_config.output_dir, task_config.result_dir)
         # 检查模型路径
         if task_config.pre_train_model:
             path_type = ".pth"
@@ -144,6 +142,12 @@ class LoadConfigTask(BaseTask):
         task_config.model_dir = os.path.join(
             task_config.output_dir,
             task_config.model_dir,
+            result_data.task_id
+        )
+        # save model dir
+        task_config.result_dir = os.path.join(
+            task_config.output_dir,
+            task_config.result_dir,
             result_data.task_id
         )
         # os.makedirs(task_config.image_dir, exist_ok=True)
