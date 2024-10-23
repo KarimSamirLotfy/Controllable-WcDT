@@ -1,1 +1,1 @@
-nohup python3 -u main.py >> trial_run.log &
+nohup python3 -u main.py >> diffusion_baseline.log &
