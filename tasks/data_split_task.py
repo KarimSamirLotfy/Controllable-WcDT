@@ -62,7 +62,7 @@ class DataSplitTask(BaseTask):
 
     @staticmethod
     def save_split_data(one_pkl_dict: Dict[str, Any], his_step: int, one_pkl_path: str):
-        pkl_data = DataUtil.split_pkl_data(one_pkl_dict, his_step)
+        pkl_data = DataUtil.split_pkl_data_for_training(one_pkl_dict, his_step)
         if pkl_data and len(pkl_data) > 0:
             with open(one_pkl_path, "wb") as f:
                 pickle.dump(pkl_data, f)

@@ -186,6 +186,13 @@ class ShowResultsTask(BaseTask):
         dataset_iterator = dataset.as_numpy_iterator()
         for index, scenario_bytes in enumerate(dataset_iterator):
             scenario = scenario_pb2.Scenario.FromString(scenario_bytes)
+            print(f'IDS')
+            all_ids = submission_specs.get_sim_agent_ids(scenario)
+            eval_ids = submission_specs.get_evaluation_sim_agent_ids(scenario)
+            print(all_ids, len(all_ids))
+            print(eval_ids, len(eval_ids))
+            print(f'index_of_eval_ids: {[all_ids.index(item) for item in eval_ids]}')
+
             data_dict = DataUtil.transform_data_to_input(scenario, result_info)
             for key, value in data_dict.items():
                 if isinstance(value, torch.Tensor):
@@ -217,7 +224,7 @@ class ShowResultsTask(BaseTask):
             predicted_obs_traj = predicted_obs_traj.cpu().detach().numpy()
 
             ### PUT into siumlation format of (x, y, z, heading) ### Do this via extrapolation
-            predicted_obs_id_traj = {obs_id: predicted_obs_traj[index] for index, obs_id in enumerate(data_dict['predicted_obs_index'])}
+            predicted_obs_id_traj = {obs_id: predicted_obs_traj[index] for index, obs_id in enumerate(data_dict['predicted_obs_index'].flatten().cpu().detach().numpy())}
             # 自车在当前时刻的位置 The position of the vehicle at the current moment
             curr_loc = data_dict['curr_loc']
             simulated_states = list()
@@ -271,7 +278,7 @@ class ShowResultsTask(BaseTask):
                 'angular_speed_likelihood': scenario_metrics.angular_speed_likelihood,
                 'angular_acceleration_likelihood': scenario_metrics.angular_acceleration_likelihood
             }
-            
+
             if result_info.train_model_config.writer is None:
                 vprint("No tensorboard writer found. creating new writer")
                 # result_info.train_model_config.writer = SummaryWriter(result_info.train_model_config.log_dir)

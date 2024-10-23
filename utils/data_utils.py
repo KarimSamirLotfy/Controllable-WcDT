@@ -6,6 +6,7 @@
 @Author: YangChen
 @Date: 2023/12/24
 """
+from builtins import print
 import json
 import math
 from typing import List, Dict, Any, Tuple
@@ -47,7 +48,7 @@ class DataUtil:
     @classmethod
     def load_obs_tracks(cls, scenario: scenario_pb2.Scenario,
                         ego_curr_x: float, ego_curr_y: float,
-                        ego_curr_heading: float) -> List[Dict[str, Any]]:
+                        ego_curr_heading: float, allow_invalid_data=True) -> List[Dict[str, Any]]:
         obs_tracks = list()
         # 一个障碍物的状态(id, 类型, 轨迹)
         for track in scenario.tracks:
@@ -58,34 +59,47 @@ class DataUtil:
             else:
                 object_type = 4
             obs_traj = list()
+            validity_list = list()
             for state in track.states:
                 if not state.valid:
-                    continue
+                    # Add an invalid default state
+                    validity_list.append(False)
+                    obs_traj.append((0, 0, 0, 0, 0))
+                else:
+                    validity_list.append(True)
+                    center_x, center_y = MapUtil.global_to_local(ego_curr_x, ego_curr_y, ego_curr_heading,
+                                                state.center_x, state.center_y)
+                    center_heading = MapUtil.theta_global_to_local(ego_curr_heading, state.heading)
+                    # 速度变化有两种方法:
+                    # 1. 在新坐标系做投影
+                    # 2. 计算新坐标系的航向角,用速度乘sin和cos
+                    curr_v = math.sqrt(math.pow(state.velocity_x, 2) +
+                                    math.pow(state.velocity_y, 2))
+                    curr_v_heading = math.atan2(state.velocity_y, state.velocity_x)
+                    curr_v_heading = MapUtil.theta_global_to_local(ego_curr_heading, curr_v_heading)
+                    obs_traj.append(
+                        (center_x, center_y, center_heading,
+                        curr_v * math.cos(curr_v_heading), curr_v * math.sin(curr_v_heading))
+                    )
                 if 'height' not in one_obs_track and 'length' not in one_obs_track \
                         and 'width' not in one_obs_track:
                     one_obs_track['height'] = state.height
                     one_obs_track['length'] = state.length
                     one_obs_track['width'] = state.width
-                center_x, center_y = MapUtil.global_to_local(ego_curr_x, ego_curr_y, ego_curr_heading,
-                                                             state.center_x, state.center_y)
-                center_heading = MapUtil.theta_global_to_local(ego_curr_heading, state.heading)
-                # 速度变化有两种方法:
-                # 1. 在新坐标系做投影
-                # 2. 计算新坐标系的航向角,用速度乘sin和cos
-                curr_v = math.sqrt(math.pow(state.velocity_x, 2) +
-                                   math.pow(state.velocity_y, 2))
-                curr_v_heading = math.atan2(state.velocity_y, state.velocity_x)
-                curr_v_heading = MapUtil.theta_global_to_local(ego_curr_heading, curr_v_heading)
-                obs_traj.append(
-                    (center_x, center_y, center_heading,
-                     curr_v * math.cos(curr_v_heading), curr_v * math.sin(curr_v_heading))
-                )
+
             one_obs_track['obs_id'] = obs_id
             one_obs_track['object_type'] = object_type
-            one_obs_track['obs_traj'] = obs_traj
-            # 轨迹丢失的障碍物不需要
-            if len(obs_traj) == 91:
+            one_obs_track['obs_traj'] = obs_traj   
+            one_obs_track['validity'] = validity_list
+            one_obs_track['valid'] = all(validity_list)
+            
+            # IF we only want to keep valid data for training. where the entire trajectory is valid.
+            if allow_invalid_data:
                 obs_tracks.append(one_obs_track)
+            elif one_obs_track['valid']:
+                obs_tracks.append(one_obs_track)
+            else:
+                print(f"obs_id: {obs_id} has no enough trajectory with only {len(obs_traj)} points and {validity_list.count(True)} valid points")
         return obs_tracks
 
     @staticmethod
@@ -134,7 +148,7 @@ class DataUtil:
         return dynamic_states
 
     @staticmethod
-    def split_pkl_data(one_pkl_dict: Dict[str, Any], his_step: int) -> Tuple:
+    def split_pkl_data_for_training(one_pkl_dict: Dict[str, Any], his_step: int, test_data=True) -> Tuple:
         map_points = [feature['polygon_points'] for feature in one_pkl_dict['map_features']]
         predicted_obs_ids = one_pkl_dict['predicted_obs_ids']
         # 初始化需要保存的信息
@@ -155,7 +169,10 @@ class DataUtil:
             obs_feature += type_onehot
             obs_feature_list.append(obs_feature)
             # 记录predicted_obs的索引
-            if one_obs_info['obs_id'] in predicted_obs_ids: # ! This is the issue. 
+            if test_data:
+                if one_obs_info['obs_id'] in predicted_obs_ids: # ! This is the issue. 
+                    predicted_obs_index.append(index)
+            else:
                 predicted_obs_index.append(index)
             traj = np.array(one_obs_info['obs_traj'])
             traj_list.append(traj)
@@ -319,14 +336,16 @@ class DataUtil:
         if len(data_dict) == 0:
             return dict()
         his_step = config_data.train_model_config.his_step
-        pkl_data = DataUtil.split_pkl_data(data_dict, his_step)
+        pkl_data = DataUtil.split_pkl_data_for_training(data_dict, his_step)
         all_obs_index = set([i for i in range(pkl_data[1].shape[0])])
         predicted_index = torch.Tensor(pkl_data[0]).to(torch.long).view(-1, 1, 1)
+        print(all_obs_index, predicted_index.flatten())
         all_obs_traj = torch.Tensor(pkl_data[1])
         all_obs_feature = torch.Tensor(pkl_data[2])
         all_obs_his_traj = all_obs_traj[:, :his_step]
         all_obs_future_traj = all_obs_traj[:, his_step:]
         other_obs_index = list(all_obs_index - set(pkl_data[0]))
+        print(f'all_obs_traj:{all_obs_traj.shape}, all_obs_feature:{all_obs_feature.shape}, all_obs_his_traj:{all_obs_his_traj.shape}, all_obs_future_traj:{all_obs_future_traj.shape}')
         # 获取障碍物信息
         other_his_traj, other_feature, other_traj_mask = cls.get_obs_feature(
             config_data, other_obs_index, all_obs_his_traj, all_obs_feature
