@@ -66,15 +66,12 @@ time_per_seconds = 0.026*batch_size
         * Dissucuss what would be a good result to have. this will not need any trianing. but will need a lot of enginnering to get right. still need also to look at energy based models
 
 # TODO Tasks
-[] Do quick run comapring diffusion model and non diffuison model. to actually see how important this is. 
-[] Fix metrics
-    * increase number of max_predicted
-    * edit scenario before giving it in
-    * implement the metrics yourself
+[x] Do quick run comapring diffusion model and non diffuison model. to actually see how important this is. 
+[x] Fix metrics (Fixed by creating new dataloader that is used during evaluation)
 []  Add sampling condigitning 
-[] actually pray that this works properly
 
 * Get the sze of the dataset
+** Number of scenarios in the dataset: 486995
  ## Min effort
  * increate number of prediceted
  * edit scenario.... somehow. hackit 

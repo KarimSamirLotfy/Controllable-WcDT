@@ -1,1 +1,1 @@
-nohup python3 -u main.py >> diffusion_baseline.log &
+nohup python3 -u main.py >> show_res_diff.log &
