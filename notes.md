@@ -71,7 +71,8 @@ time_per_seconds = 0.026*batch_size
 []  Add sampling condigitning 
 
 * Get the sze of the dataset
-** Number of scenarios in the dataset: 486995
+* Number of scenarios in the dataset: 486995
+* Ratio = 50000/486995 = 0.1 = 10% So we are using 10 percent of the data
  ## Min effort
  * increate number of prediceted
  * edit scenario.... somehow. hackit 
