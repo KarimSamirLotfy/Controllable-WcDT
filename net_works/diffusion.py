@@ -224,6 +224,26 @@ class GaussianDiffusion(nn.Module):
             noise = self.norm_output(noise)
             noise = torch.transpose(noise, 1, -1)
         return noise
+    
+    def sample_step(self, noise, t, predicted_his_traj):
+        if self.diffusion_type != "none":
+            batch_size = predicted_his_traj.shape[0]
+            device = predicted_his_traj.device
+            t_batch = torch.tensor([t], device=device).repeat(batch_size)
+            noise = self.remove_noise(noise, t_batch, predicted_his_traj)
+            if t > 0:
+                noise += extract(self.sigma, t_batch, noise.shape) * torch.randn_like(noise)
+            noise = torch.transpose(noise, 1, -1)
+            noise = self.norm_output(noise)
+            noise = torch.transpose(noise, 1, -1)
+        return noise
+    
+    def sample_using_sample_step(self, noise, predicted_his_traj):
+        if self.diffusion_type != "none":
+            for t in range(self.num_time_steps - 1, -1, -1):
+                noise = self.sample_step(noise, t, predicted_his_traj)
+        return noise
+    
 
     def perturb_x(self, future_traj, t, noise):
         return (

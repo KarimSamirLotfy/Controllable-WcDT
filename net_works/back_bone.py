@@ -138,3 +138,58 @@ class BackBone(nn.Module):
         traj_loss, confidence_loss, min_loss_traj = self.multi_modal_loss(traj, confidence, predicted_future_traj,
                                                                           predicted_traj_mask)                    
         return min_loss_traj, confidence
+    
+    def sample_conditioned(self, data: Dict, f_x):
+        # batch, other_obs(10), 40, 7
+        predicted_feature = data['predicted_feature']
+        # batch, other_obs(10), 40, 5
+        other_his_pos = data['other_his_pos']
+        other_his_traj_delt = data['other_his_traj_delt']
+        other_feature = data['other_feature']
+        other_traj_mask = data['other_traj_mask']
+        # predicted_his_pos is the starting position that the model will be conditoned on.
+        predicted_his_pos = data['predicted_his_pos'] # shape = batch, max_pred_num, 2
+        predicted_his_traj_delt = data['predicted_his_traj_delt'] # shape = batch, max_pred_num, timesteps, 5
+        predicted_his_traj = data['predicted_his_traj']
+        predicted_traj_mask = data['predicted_traj_mask']
+        # batch, pred_obs(15), 50, 5
+        predicted_future_traj = data['predicted_future_traj']
+        predicted_traj_mask = data['predicted_traj_mask']
+        # batch, tl_num(10), 2
+        traffic_light = data['traffic_light']
+        traffic_light_pos = data['traffic_light_pos']
+        # batch, num_lane(32), num_point(128), 2
+        lane_list = data['lane_list']
+        # diffusion训练
+        noise = torch.randn_like(predicted_his_traj_delt)
+        print(f'noise shape: {noise.shape}')
+        ### HERE WE START SAMPLING AND PROPAGATING THE NOISE
+        for t in range(self.diffusion.num_time_steps - 1, -1, -1):
+            condition = predicted_his_traj
+            behavior = self.diffusion.sample_step(noise, t, condition)
+
+            # scene encoder
+            scene_feature = self.scene_encoder(
+                behavior, lane_list,
+                other_his_traj_delt, other_his_pos, other_feature,
+                predicted_his_traj_delt, predicted_his_pos, predicted_feature,
+                traffic_light, traffic_light_pos
+            )
+            # traj_decoder
+            # shape: batch, max_pred_num, Multi-modal(AKA anchors), timesteps, 3
+            # confidence.shape = batch, max_pred_num, Multi-modal
+            traj, confidence = self.traj_decoder(scene_feature) 
+
+            # shape_post_processed = batch, max_pred_num, multi-modal, timesteps, 5
+            traj = MathUtil.post_process_output(traj, predicted_his_traj)
+
+            # min_loss_traj.shape = batch, max_pred_num, timesteps, 5
+            traj_loss, confidence_loss, min_loss_traj = self.multi_modal_loss(traj, confidence, predicted_future_traj,
+                                                                            predicted_traj_mask)                    
+
+            unguided_min_traj_loss = min_loss_traj
+            score = f_x(unguided_min_traj_loss)
+            gradient_of_score = torch.autograd.grad(score, behavior, create_graph=True)[0]
+            behavior = behavior + 3*gradient_of_score
+            noise = behavior
+            yield min_loss_traj, confidence

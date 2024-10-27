@@ -56,14 +56,14 @@ class ShowResultsTask(BaseTask):
         100
     )
     COLOR_DICT = {
-        0: np.array([0., 120., 255.]) / 255,
-        1: np.array([0., 232., 157.]) / 255,
-        2: np.array([255., 205., 85.]) / 255,
-        3: np.array([244., 175., 145.]) / 255,
-        4: np.array([145., 80., 200.]) / 255,
-        5: np.array([0., 51., 102.]) / 255,
-        6: np.array([1, 0, 0]),
-        7: np.array([0, 1, 0]),
+        0: np.array([0., 120., 255.]) / 255, # blue
+        1: np.array([0., 232., 157.]) / 255, # Green-blueish
+        2: np.array([255., 205., 85.]) / 255, # Orange
+        3: np.array([244., 175., 145.]) / 255, # Redish orange
+        4: np.array([145., 80., 200.]) / 255, # Pruple
+        5: np.array([0., 51., 102.]) / 255, # Dark blue
+        6: np.array([1, 0, 0]), # RED
+        7: np.array([0, 1, 0]), # GREEN
     }
 
     def __init__(self):
@@ -128,7 +128,7 @@ class ShowResultsTask(BaseTask):
         dataset_iterator = dataset.as_numpy_iterator()
         for index, scenario_bytes in enumerate(dataset_iterator):
             scenario = scenario_pb2.Scenario.FromString(scenario_bytes)
-            data_dict = DataUtil.transform_data_to_input(scenario, result_info)
+            data_dict = DataUtil.transform_data_to_input(scenario, result_info, evaluation_data=True)
             for key, value in data_dict.items():
                 if isinstance(value, torch.Tensor):
                     data_dict[key] = value.to(torch.float32).unsqueeze(dim=0)

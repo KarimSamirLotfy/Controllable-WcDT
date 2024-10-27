@@ -77,3 +77,10 @@ time_per_seconds = 0.026*batch_size
  * increate number of prediceted
  * edit scenario.... somehow. hackit 
  * implement the metrics. 
+
+
+# ANOTHER MODEL is SMART
+* Won the 2024 sim agents. but it is autoregressive.
+* Fact that autoregressive always wins means that, Maybe seeing the prediction of each agent helps the model
+* Codebase could be used to create diffusion model with state of the art. by stopping autoregressive and actually going for a more diffusion based arch
+* This one would make sence as it uses latent diffuison. so adversrial would just be finding the motion token that causes the most harm. 

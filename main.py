@@ -11,7 +11,7 @@ from typing import List
 from common import TaskType, LoadConfigResultDate, TaskLogger
 from tasks import BaseTask
 from tasks import (LoadConfigTask, DataPreprocessTask, DataSplitTask,
-                   DataCountTask, TrainModelTask, ShowResultsTask)
+                   DataCountTask, TrainModelTask, ShowResultsTask, ConditionedShowResultsTask)
 
 
 class TaskFactory:
@@ -37,6 +37,8 @@ class TaskFactory:
                 task_list.append(TrainModelTask())
             elif task_type == TaskType.SHOW_RESULTS:
                 task_list.append(ShowResultsTask())
+            elif task_type == TaskType.CONDITIONED_SHOW_RESULTS:
+                task_list.append(ConditionedShowResultsTask())
         return task_list
 
 

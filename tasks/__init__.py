@@ -14,6 +14,7 @@ from tasks.data_split_task import DataSplitTask
 from tasks.data_count_task import DataCountTask
 from tasks.train_model_task import TrainModelTask
 from tasks.show_result_task import ShowResultsTask
+from tasks.conditioned_show_results_task import ConditionedShowResultsTask
 
 BaseTask = BaseTask
 LoadConfigTask = LoadConfigTask
@@ -21,3 +22,5 @@ DataPreprocessTask = DataPreprocessTask
 DataSplitTask = DataSplitTask
 TrainModelTask = TrainModelTask
 ShowResultsTask = ShowResultsTask
+ConditionedShowResultsTask = ConditionedShowResultsTask
+

@@ -16,3 +16,4 @@ investigate/*
 output_big_run_10x/*
 output*/*
 show_results*/*
+cond_show_results*/*
