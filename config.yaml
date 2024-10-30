@@ -3,13 +3,13 @@ task_config:
   #  - "DATA_PREPROCESS"
   #  - "DATA_SPLIT"
   #  - "DATA_COUNT"
-  #  - "TRAIN_MODEL"
-   - "SHOW_RESULTS"
+   - "TRAIN_MODEL"
+  #  - "SHOW_RESULTS"
   #  - "CONDITIONED_SHOW_RESULTS"
   #  - "EVAL_MODEL"
   #  - "GENE_SUBMISSION"
   # 程序执行过程中的输出总目录
-  output_dir: "output"
+  output_dir: "output_100x_baseline"
   log_dir: "log"
   image_dir: "result_image"
   gifs_dir: "result_gifs"
@@ -31,7 +31,7 @@ task_config:
 
 data_preprocess_config:
   data_size: 100
-  max_data_size: 50000
+  max_data_size: 500000
   num_works: 20
 
 
@@ -62,8 +62,8 @@ train_model_config:
   diffusion_type: 'dit'
   # saveing model
   save_model: True
-  save_interval_epoch: 20 #also is the visulzation interval. 
+  save_interval_epoch: 1 
 
   # Visualization
-  vis_interval_epoch: 5
-  samples_to_visualize: 5
+  vis_interval_epoch: 10
+  samples_to_visualize: 10

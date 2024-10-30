@@ -1,1 +1,1 @@
-nohup python3 -u main.py >> show_res_diff.log &
+nohup python3 -u main.py >> baseline_100x_diffusion.log &

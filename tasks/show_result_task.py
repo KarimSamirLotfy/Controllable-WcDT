@@ -45,7 +45,7 @@ from torch.utils.tensorboard import SummaryWriter
 RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
 DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
 VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
-MODEL_PATH = r"/home/k.lotfy/WcDT/output/model/20241030-12-40-53_53746/epoch_0_batch_num_9_model.pth"
+MODEL_PATH = r"/home/k.lotfy/WcDT/output_scaled_up_diffusion/model/20241030-14-27-32_70188/epoch_20_batch_num_70_model.pth"
 MODELS_DIR = r"/home/k.lotfy/WcDT/output/model/20241018-00-09-19_60149" # This does evaluation on differetn iterations of the smae model at different epochs.
 
 class ShowResultsTask(BaseTask):
@@ -85,8 +85,8 @@ class ShowResultsTask(BaseTask):
         if os.path.exists(RESULT_DIR):
             shutil.rmtree(RESULT_DIR)
         os.makedirs(RESULT_DIR, exist_ok=True)
-        NUM_OF_SAMPLES = 100
-        self.show_result(result_info, max_dataset=NUM_OF_SAMPLES)
+        NUM_OF_SAMPLES = 20
+        # self.show_result(result_info, max_dataset=NUM_OF_SAMPLES)
         # Show Metrics for Model progress
         self.evaluate_metrics(result_info, number_of_scenarios=NUM_OF_SAMPLES)
         
@@ -328,16 +328,14 @@ class ShowResultsTask(BaseTask):
         metrics_df = pd.DataFrame(metrics_logs)
         print(metrics_df)
         # Save the metrics to a csv file
-        os.makedirs(f'{RESULT_DIR}/metrics', exist_ok=True)
-        metrics_df.to_csv(os.path.join(f'{RESULT_DIR}/metrics', f"metrics_{epoch_num}.csv") )
-        metrics_df.to_csv(os.path.join(f'{result_info.task_config.result_dir}', f"metrics_{epoch_num}.csv") )
+        os.makedirs(f'{RESULT_DIR}/{result_info.task_id}/metrics', exist_ok=True)
+        metrics_df.to_csv(os.path.join(f'{RESULT_DIR}/{result_info.task_id}/metrics', f"metrics_{epoch_num}.csv") )
 
         # aggregate the metrics via mean and print them
         print(f"Aggregated metrics for epoch {epoch_num}:")
         aggretgate = metrics_df.mean()
         print(aggretgate)
-        aggretgate.to_csv(os.path.join(f'{RESULT_DIR}/metrics', f"metrics_aggregated_{epoch_num}.csv") )
-        aggretgate.to_csv(os.path.join(f'{result_info.task_config.result_dir}', f"metrics_aggregated_{epoch_num}.csv") )
+        aggretgate.to_csv(os.path.join(f'{RESULT_DIR}/{result_info.task_id}/metrics', f"metrics_aggregated_{epoch_num}.csv") )
 
 
 

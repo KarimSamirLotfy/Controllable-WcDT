@@ -10,6 +10,7 @@ valid_set/*
 output/*
 data_set/*
 data_output/*
+data_output*/*
 
 *.log
 investigate/*
@@ -17,3 +18,4 @@ output_big_run_10x/*
 output*/*
 show_results*/*
 cond_show_results*/*
+old_things/*

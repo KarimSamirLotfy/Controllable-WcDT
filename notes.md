@@ -72,13 +72,18 @@ time_per_seconds = 0.026*batch_size
 
 [x] Get the sze of the dataset
 * Number of scenarios in the dataset: 486995
-* Ratio = 50000/486995 = 0.1 = 10% So we are using 10 percent of the data
+* Ratio = 50000 / 486995 = 0.1 = 10% So we are using 10 percent of the data
 
  ## Min effort
  * increate number of prediceted
  * edit scenario.... somehow. hackit 
  * implement the metrics. 
 
+81G -> 223700
+52G -> 305500
+29G ->  81,800
+1G -> 2820
+146640
 
 # ANOTHER MODEL is SMART
 * Won the 2024 sim agents. but it is autoregressive.
