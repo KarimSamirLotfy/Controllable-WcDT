@@ -30,7 +30,7 @@ And this could lead to expolits with the secruity team. so removeed the anaconda
 
 
 [] Do with full data
-[ ] get the eval code. 
+[] get the eval code. 
 [] decidec on to keep the arch or not. 
 # also ask for more space. Run ID: 
 
@@ -70,9 +70,10 @@ time_per_seconds = 0.026*batch_size
 [x] Fix metrics (Fixed by creating new dataloader that is used during evaluation)
 []  Add sampling condigitning 
 
-* Get the sze of the dataset
+[x] Get the sze of the dataset
 * Number of scenarios in the dataset: 486995
 * Ratio = 50000/486995 = 0.1 = 10% So we are using 10 percent of the data
+
  ## Min effort
  * increate number of prediceted
  * edit scenario.... somehow. hackit 
@@ -84,3 +85,31 @@ time_per_seconds = 0.026*batch_size
 * Fact that autoregressive always wins means that, Maybe seeing the prediction of each agent helps the model
 * Codebase could be used to create diffusion model with state of the art. by stopping autoregressive and actually going for a more diffusion based arch
 * This one would make sence as it uses latent diffuison. so adversrial would just be finding the motion token that causes the most harm. 
+
+
+
+# TODO 10/30
+[] scale up the model
+[] scale up the dataset
+[] train big model and see if diffusion really helps
+[] Get SMART working 
+    [] do visulsations
+    [] do metrics
+    [] see scale
+
+# scale up the model.
+* Normla model can 800 batch size on 2 GPUs this means that each gpu can do max 400. this creates a 92% gpu utility. any more is unsafe.
+* The diffusion model does not add a lot of vram, only adds utilization. which is not a bottlenect
+*   max_pred_num: 16
+    max_other_num: 12
+* with 800 creates a vram on 2 gpus of 98%. which is unstable and shoule be decreased a bit. 
+# Get more space
+* We need extra which is extra 180GB
+## Get the 32 samples working
+* 
+# Getting Compute
+* get 2 more GPUs
+* Deploy on AWS. pay per GPU 
+* Jupyter Deploy <1000 GPU hours>
+
+

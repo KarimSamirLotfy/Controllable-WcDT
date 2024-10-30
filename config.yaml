@@ -3,9 +3,9 @@ task_config:
   #  - "DATA_PREPROCESS"
   #  - "DATA_SPLIT"
   #  - "DATA_COUNT"
-  #  - "TRAIN_MODEL"
+   - "TRAIN_MODEL"
   #  - "SHOW_RESULTS"
-   - "CONDITIONED_SHOW_RESULTS"
+  #  - "CONDITIONED_SHOW_RESULTS"
   #  - "EVAL_MODEL"
   #  - "GENE_SUBMISSION"
   # 程序执行过程中的输出总目录
@@ -36,16 +36,16 @@ data_preprocess_config:
 
 
 train_model_config:
-  use_gpu: False
+  use_gpu: True
   gpu_ids:
     - 0
     - 1
-  batch_size: 512
+  batch_size: 700
   overfit_batches: 0
   num_works: 0
   his_step: 11
-  max_pred_num: 8
-  max_other_num: 6
+  max_pred_num: 16
+  max_other_num: 12
   max_traffic_light: 8
   max_lane_num: 32
   max_point_num: 128
@@ -55,7 +55,7 @@ train_model_config:
   time_steps: 50
   # cosine or linear
   schedule: "linear"
-  num_epoch: 200
+  num_epoch: 201
   init_lr: 0.0001
   # training
   teacher_forcing: True # Use grout truth for scence encoding not the samled diffusion path. makes training faster

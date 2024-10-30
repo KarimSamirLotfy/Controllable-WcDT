@@ -126,12 +126,12 @@ class TrainModelTask(BaseTask):
                 fig = VisualizeUtil.show_result(image_path, min_loss_traj, data)
                 writer.add_figure('trajector-img', fig, global_iteration)
             if result_info.train_model_config.save_model == True:
-                if epoch_num % result_info.train_model_config.save_interval_epoch == 0 and iteration == 0:
+                if epoch_num % result_info.train_model_config.save_interval_epoch == 0 and iteration == epoch_step - 1:
                     model_save_path = os.path.join(result_info.task_config.model_dir,
                                                    f"epoch_{epoch_num}_batch_num_{iteration}_model.pth")
                     torch.save(model.state_dict(), model_save_path)
             if result_info.train_model_config.vis_interval_epoch > 0:
-                if epoch_num % result_info.train_model_config.vis_interval_epoch == 0 and iteration == 0:
+                if epoch_num % result_info.train_model_config.vis_interval_epoch == 0 and iteration == epoch_step - 1:
                     # Visualise the results
                     save_dir_path = os.path.join(result_info.task_config.gifs_dir, f'{epoch_num}-epoch') # create a folder with epoch number
                     os.makedirs(save_dir_path, exist_ok=True)
