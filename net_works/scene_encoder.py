@@ -95,7 +95,7 @@ class SceneEncoder(nn.Module):
         x = torch.flatten(x, start_dim=2)
         other_his_traj_delt = torch.flatten(other_his_traj_delt, start_dim=2)
         # 对各个位置进行位置编码 Position-encode individual locations
-        lane_list = self.pos_embedding(lane_list)
+        lane_list = self.pos_embedding(lane_list) # batch, max_obs_light(32), 128, embedding(32)
         lane_list = lane_list.view(batch_size, -1, self.embedding_dim)
         traffic_light_pos = self.pos_embedding(traffic_light_pos)
         other_his_pos = self.pos_embedding(other_his_pos)

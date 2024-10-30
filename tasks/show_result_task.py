@@ -45,7 +45,7 @@ from torch.utils.tensorboard import SummaryWriter
 RESULT_DIR = r"/home/k.lotfy/WcDT/show_results"
 DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/training/training.tfrecord-00000-of-01000"
 VALIDATION_DATA_SET_PATH = r"/home/k.lotfy/data/womd-mini/waymo-micro/validation/validation.tfrecord-00000-of-00150"
-MODEL_PATH = r"/home/k.lotfy/WcDT/investigate/baseline-10x-run/output_big_run_10x/model/20241018-00-09-19_60149/epoch_180_batch_num_0_model.pth"
+MODEL_PATH = r"/home/k.lotfy/WcDT/output/model/20241030-12-40-53_53746/epoch_0_batch_num_9_model.pth"
 MODELS_DIR = r"/home/k.lotfy/WcDT/output/model/20241018-00-09-19_60149" # This does evaluation on differetn iterations of the smae model at different epochs.
 
 class ShowResultsTask(BaseTask):
@@ -56,15 +56,25 @@ class ShowResultsTask(BaseTask):
         100
     )
     COLOR_DICT = {
-        0: np.array([0., 120., 255.]) / 255, # blue
-        1: np.array([0., 232., 157.]) / 255, # Green-blueish
-        2: np.array([255., 205., 85.]) / 255, # Orange
-        3: np.array([244., 175., 145.]) / 255, # Redish orange
-        4: np.array([145., 80., 200.]) / 255, # Pruple
-        5: np.array([0., 51., 102.]) / 255, # Dark blue
-        6: np.array([1, 0, 0]), # RED
-        7: np.array([0, 1, 0]), # GREEN
+        0: np.array([0., 120., 255.]) / 255,       # Blue
+        1: np.array([0., 232., 157.]) / 255,       # Green-blueish
+        2: np.array([255., 205., 85.]) / 255,      # Orange
+        3: np.array([244., 175., 145.]) / 255,     # Reddish-orange
+        4: np.array([145., 80., 200.]) / 255,      # Purple
+        5: np.array([0., 51., 102.]) / 255,        # Dark blue
+        6: np.array([255., 0., 0.]) / 255,         # Red
+        7: np.array([0., 255., 0.]) / 255,         # Green
+        8: np.array([255., 255., 0.]) / 255,       # Yellow
+        9: np.array([128., 0., 128.]) / 255,       # Indigo
+        10: np.array([255., 192., 203.]) / 255,    # Pink
+        11: np.array([0., 0., 128.]) / 255,        # Navy
+        12: np.array([192., 192., 192.]) / 255,    # Silver
+        13: np.array([139., 69., 19.]) / 255,      # Saddle Brown
+        14: np.array([75., 0., 130.]) / 255,       # Dark Indigo
+        15: np.array([60., 179., 113.]) / 255,     # Medium Sea Green
+        16: np.array([75., 130., 0.]) / 255        # Medium Sea Green
     }
+
 
     def __init__(self):
         self.task_type = self.TASK_TYPE
@@ -208,8 +218,7 @@ class ShowResultsTask(BaseTask):
             data_dict = DataUtil.transform_data_to_input(scenario, result_info, evaluation_data=True)
             for key, value in data_dict.items():
                 if isinstance(value, torch.Tensor):
-                    data_dict[key] = value.to(torch.float32).unsqueeze(dim=0).to(device)
-
+                    data_dict[key] = value.to(torch.float32).repeat(32, * ([1] * value.dim())).to(device) # hACKY WAY TO repreat all tensors 32 times. to simulate batch of 32 with all values being the same. 
             ### Data prepratation done
 
             ### Create logged trajectories ###
@@ -232,42 +241,49 @@ class ShowResultsTask(BaseTask):
             predicted_obs_id = submission_specs.get_evaluation_sim_agent_ids(scenario)
 
             ### MODEL INFERENCE ###
-            predicted_obs_traj, _confidence = model.predict(data_dict)
-            predicted_obs_traj = predicted_obs_traj.cpu().detach().numpy()
+            scenarios_predicted_obs_traj, _confidence = model.predict(data_dict) # 32, max_pred_num, timesteps, 5
+            scenarios_predicted_obs_traj = scenarios_predicted_obs_traj.cpu().detach().numpy()
 
-            ### PUT into siumlation format of (x, y, z, heading) ### Do this via extrapolation
-            ## Map each ID to it's prediction or default to 0,0,0,0
-            # data_dict['predicted_obs_index'] maps the index of the model output to the index of the trajectory
-            mapper_predicted_obs_index_to_id = data_dict['mapper_predicted_obs_index_to_id']
-            predicted_obs_id_traj = {mapper_predicted_obs_index_to_id[int(trajectory_index_in_input)]: predicted_obs_traj[output_index] for output_index, trajectory_index_in_input in enumerate(data_dict['predicted_obs_index'].flatten().cpu().detach().numpy())}
-            # 自车在当前时刻的位置 The position of the vehicle at the current moment
-            curr_loc = data_dict['curr_loc']
-            simulated_states = list()
-            for idx, obs_id in enumerate(all_ids):
-                if obs_id not in predicted_obs_id_traj.keys(): # if it is not one of the agents to be predicted. then ignore it. 
-                    simulated_states.append(np.zeros(shape=(80, 4)))
-                else: # otherwise, simulate it
-                    one_predicted_obs_traj = predicted_obs_id_traj[obs_id]
-                    one_predicted_obs_x = one_predicted_obs_traj[:, 0]
-                    one_predicted_obs_y = one_predicted_obs_traj[:, 1]
-                    one_predicted_obs_z = np.array([float(logged_trajectories.z[:, -1][idx])] * 80)
-                    one_predicted_obs_x, one_predicted_obs_y = MapUtil.local_to_global(curr_loc[2], one_predicted_obs_x,
-                                                                            one_predicted_obs_y, curr_loc[0], curr_loc[1])
-                    one_predicted_obs_heading = MapUtil.theta_local_to_global(curr_loc[2], one_predicted_obs_traj[:, 2])
-                    one_simulated_state = np.stack((one_predicted_obs_x, one_predicted_obs_y,
-                                                    one_predicted_obs_z, one_predicted_obs_heading), axis=-1)
-                    simulated_states.append(one_simulated_state)
-            simulated_states = np.stack(simulated_states, axis=0)
-            simulated_states = np.stack([simulated_states] * submission_specs.N_ROLLOUTS, axis=0)
-            simulated_states = tf.convert_to_tensor(simulated_states)
+            simulated_scenarios = list()
+            for i in range(scenarios_predicted_obs_traj.shape[0]): 
+                predicted_obs_traj = scenarios_predicted_obs_traj[i]
+                ### PUT into siumlation format of (x, y, z, heading) ### Do this via extrapolation
+                ## Map each ID to it's prediction or default to 0,0,0,0
+                # data_dict['predicted_obs_index'] maps the index of the model output to the index of the trajectory
+                mapper_predicted_obs_index_to_id = data_dict['mapper_predicted_obs_index_to_id']
+                index_for_each_predicted_trajectory_in_order = data_dict['predicted_obs_index'][i].flatten().cpu().detach().numpy() # All are the same so take the 1st one, [3, 5, 8] means that 1st traj for id 3 second for id 5 and 3rd for id 8 and so on
+                predicted_obs_id_traj = {mapper_predicted_obs_index_to_id[int(trajectory_index_in_input)]: predicted_obs_traj[output_index] for output_index, trajectory_index_in_input in enumerate(index_for_each_predicted_trajectory_in_order)}
+                # 自车在当前时刻的位置 The position of the vehicle at the current moment
+                curr_loc = data_dict['curr_loc']
+                simulated_states = list()
+                for idx, obs_id in enumerate(all_ids):
+                    if obs_id not in predicted_obs_id_traj.keys(): # if it is not one of the agents to be predicted. then ignore it. 
+                        simulated_states.append(np.zeros(shape=(80, 4)))
+                    else: # otherwise, simulate it
+                        one_predicted_obs_traj = predicted_obs_id_traj[obs_id]
+                        one_predicted_obs_x = one_predicted_obs_traj[:, 0]
+                        one_predicted_obs_y = one_predicted_obs_traj[:, 1]
+                        one_predicted_obs_z = np.array([float(logged_trajectories.z[:, -1][idx])] * 80)
+                        one_predicted_obs_x, one_predicted_obs_y = MapUtil.local_to_global(curr_loc[2], one_predicted_obs_x,
+                                                                                one_predicted_obs_y, curr_loc[0], curr_loc[1])
+                        one_predicted_obs_heading = MapUtil.theta_local_to_global(curr_loc[2], one_predicted_obs_traj[:, 2])
+                        one_simulated_state = np.stack((one_predicted_obs_x, one_predicted_obs_y,
+                                                        one_predicted_obs_z, one_predicted_obs_heading), axis=-1)
+                        simulated_states.append(one_simulated_state)
+                simulated_states = np.stack(simulated_states, axis=0)
+                simulated_scenarios.append(simulated_states)
+
+            simulated_scenarios = np.stack(simulated_scenarios, axis=0)
+            # simulated_states = np.stack([simulated_states] * submission_specs.N_ROLLOUTS, axis=0)
+            simulated_scenarios = tf.convert_to_tensor(simulated_scenarios)
 
 
-            joint_scene = EvalUtil.joint_scene_from_states(simulated_states[0, :, :, :],
+            joint_scene = EvalUtil.joint_scene_from_states(simulated_scenarios[0, :, :, :],
                                                 logged_trajectories.object_id)
             # Validate the joint scene. Should raise an exception if it's invalid.
             submission_specs.validate_joint_scene(joint_scene, scenario)
             scenario_rollouts = EvalUtil.scenario_rollouts_from_states(
-                scenario, simulated_states, logged_trajectories.object_id)
+                scenario, simulated_scenarios, logged_trajectories.object_id)
             # As before, we can validate the message we just generate.
             submission_specs.validate_scenario_rollouts(scenario_rollouts, scenario)
             # Compute the features for a single JointScene.
